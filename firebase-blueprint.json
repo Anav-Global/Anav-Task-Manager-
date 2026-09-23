@@ -1,0 +1,221 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role-based access information",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Matches Firebase Auth UID"
+        },
+        "name": {
+          "type": "string",
+          "description": "User full name"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["employee", "tl", "manager"],
+          "description": "User authorization role"
+        },
+        "client_ids": {
+          "type": "array",
+          "description": "Optional list of client IDs this user is scoped to"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Account creation timestamp"
+        }
+      },
+      "required": ["id", "name", "email", "role", "created_at"]
+    },
+    "ClientGroup": {
+      "title": "ClientGroup",
+      "description": "Client grouping entity",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Client group document ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Group display name"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User ID who created the group"
+        }
+      },
+      "required": ["id", "name", "created_at", "created_by"]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Client record with group reference and status",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Client document ID"
+        },
+        "name": {
+          "type": "string",
+          "description": "Client name"
+        },
+        "group_id": {
+          "type": "string",
+          "description": "References client_groups.id or null"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive"],
+          "description": "Client status"
+        },
+        "contact_info": {
+          "type": "string",
+          "description": "Optional free text contact information"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Creation timestamp"
+        },
+        "created_by": {
+          "type": "string",
+          "description": "User ID who created the client"
+        }
+      },
+      "required": ["id", "name", "status", "created_at", "created_by"]
+    },
+    "SOP": {
+      "title": "SOP",
+      "description": "Standard Operating Procedure document associated with a client",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "SOP document ID"
+        },
+        "client_id": {
+          "type": "string",
+          "description": "References clients.id"
+        },
+        "title": {
+          "type": "string",
+          "description": "SOP title"
+        },
+        "content": {
+          "type": "string",
+          "description": "Plain multiline text content"
+        },
+        "order": {
+          "type": "number",
+          "description": "Optional step order number"
+        },
+        "last_updated_by": {
+          "type": "string",
+          "description": "User ID who last updated the SOP"
+        },
+        "last_updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last update timestamp"
+        }
+      },
+      "required": ["id", "client_id", "title", "content", "last_updated_by", "last_updated_at"]
+    },
+    "TaskTemplate": {
+      "title": "TaskTemplate",
+      "description": "Recurring task template specification",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "client_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "frequency": { "type": "string", "enum": ["weekly", "monthly", "semi_monthly", "quarterly", "yearly"] },
+        "anchor_date": { "type": "string", "format": "date-time", "description": "Used for weekly, monthly, quarterly, yearly" },
+        "anchor_day_1": { "type": "number", "description": "Day of month (1-31) for semi_monthly" },
+        "anchor_day_2": { "type": "number", "description": "Day of month (1-31) for semi_monthly" },
+        "assigned_to": { "type": "string" },
+        "active": { "type": "boolean" },
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "client_id", "title", "frequency", "assigned_to", "active", "created_by", "created_at"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Task instance created from template or as a one-off item",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "client_id": { "type": "string" },
+        "template_id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "assigned_to": { "type": "string" },
+        "due_date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["pending", "done", "skipped"] },
+        "created_by": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "completed_at": { "type": "string", "format": "date-time" },
+        "completed_by": { "type": "string" }
+      },
+      "required": ["id", "client_id", "title", "assigned_to", "due_date", "status", "created_by", "created_at"]
+    },
+    "TaskComment": {
+      "title": "TaskComment",
+      "description": "Comment on a task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "task_id": { "type": "string" },
+        "user_id": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "task_id", "user_id", "text", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User collection storing profile and RBAC role"
+    },
+    "/client_groups/{groupId}": {
+      "schema": "ClientGroup",
+      "description": "Client groups collection"
+    },
+    "/clients/{clientId}": {
+      "schema": "Client",
+      "description": "Clients collection with status and group assignment"
+    },
+    "/sops/{sopId}": {
+      "schema": "SOP",
+      "description": "Standard Operating Procedures collection scoped to clients"
+    },
+    "/task_templates/{templateId}": {
+      "schema": "TaskTemplate",
+      "description": "Templates for recurring tasks"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Individual task records"
+    },
+    "/task_comments/{commentId}": {
+      "schema": "TaskComment",
+      "description": "Task comments collection"
+    }
+  }
+}
