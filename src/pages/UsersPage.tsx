@@ -41,12 +41,18 @@ const roleBadges: Record<UserRole, { bg: string; text: string; border: string; l
 };
 
 export const UsersPage: React.FC = () => {
-  const { userDoc } = useAuth();
-  const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const { userDoc, loading: authLoading } = useAuth();
+  const isManager = userDoc?.role === 'manager';
 
-  // Guard: if an employee somehow hits /dashboard/users, redirect to clients
-  if (!isPrivileged) {
-    return <Navigate to="/dashboard/clients" replace />;
+  // Guard: if non-manager (e.g. TL or employee) hits /dashboard/users, redirect to tasks with message
+  if (!authLoading && !isManager) {
+    return (
+      <Navigate
+        to="/dashboard/tasks"
+        state={{ message: 'This section is only available to managers' }}
+        replace
+      />
+    );
   }
 
   const [users, setUsers] = useState<UserDoc[]>([]);

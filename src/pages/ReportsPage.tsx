@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Navigate } from 'react-router-dom';
 import {
   collection,
   onSnapshot,
@@ -69,8 +70,20 @@ function getDefaultDateRange(): { start: string; end: string } {
 }
 
 export const ReportsPage: React.FC = () => {
-  const { userDoc, user } = useAuth();
+  const { userDoc, user, loading: authLoading } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const isManager = userDoc?.role === 'manager';
+
+  // Guard: if non-manager (e.g. TL or employee) hits /dashboard/reports, redirect to tasks with message
+  if (!authLoading && !isManager) {
+    return (
+      <Navigate
+        to="/dashboard/tasks"
+        state={{ message: 'This section is only available to managers' }}
+        replace
+      />
+    );
+  }
 
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);

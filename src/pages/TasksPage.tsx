@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   collection,
   onSnapshot,
@@ -31,6 +32,7 @@ import {
   RefreshCw,
   Power,
   Layers,
+  X,
 } from 'lucide-react';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
@@ -85,12 +87,31 @@ function formatDisplayDateTime(val: any): string {
 export const TasksPage: React.FC = () => {
   const { user, userDoc } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const isManager = userDoc?.role === 'manager';
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const [bannerMessage, setBannerMessage] = useState<string | null>(null);
+
+  // Check for redirect message from route guards (e.g. TL accessing Users/Reports)
+  useEffect(() => {
+    if (location.state && (location.state as any).message) {
+      setBannerMessage((location.state as any).message);
+      // Clean up location state so refresh or back navigation doesn't replay the banner
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate, location.pathname]);
 
   // Data state
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [users, setUsers] = useState<UserDoc[]>([]);
+
+  // Restrict task assignees strictly to users with role === 'employee' (never tl or manager)
+  const employeeUsers = useMemo(() => {
+    return users.filter((u) => u.role === 'employee');
+  }, [users]);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1033,6 +1054,24 @@ export const TasksPage: React.FC = () => {
 
   return (
     <div className="space-y-8">
+      {/* Route Guard Redirect Alert Banner */}
+      {bannerMessage && (
+        <div className="flex items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-sm shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <span className="font-medium">{bannerMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setBannerMessage(null)}
+            className="p-1 rounded-lg text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition-colors cursor-pointer"
+            title="Dismiss message"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -1389,9 +1428,9 @@ export const TasksPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
                   >
                     <option value="">Select an employee</option>
-                    {users.map((u) => (
+                    {employeeUsers.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -1558,9 +1597,10 @@ export const TasksPage: React.FC = () => {
                     onChange={(e) => setEditTemplateAssignee(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
                   >
-                    {users.map((u) => (
+                    <option value="">Select an employee</option>
+                    {employeeUsers.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -1788,9 +1828,9 @@ export const TasksPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
                   >
                     <option value="">Select an employee</option>
-                    {users.map((u) => (
+                    {employeeUsers.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -1891,9 +1931,10 @@ export const TasksPage: React.FC = () => {
                     onChange={(e) => setEditTaskAssignee(e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
                   >
-                    {users.map((u) => (
+                    <option value="">Select an employee</option>
+                    {employeeUsers.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
+                        {u.name}
                       </option>
                     ))}
                   </select>

@@ -143,7 +143,7 @@
         "client_id": { "type": "string" },
         "title": { "type": "string" },
         "description": { "type": "string" },
-        "frequency": { "type": "string", "enum": ["weekly", "monthly", "semi_monthly", "quarterly", "yearly"] },
+        "frequency": { "type": "string", "enum": ["daily", "weekly", "monthly", "semi_monthly", "quarterly", "yearly"] },
         "anchor_date": { "type": "string", "format": "date-time", "description": "Used for weekly, monthly, quarterly, yearly" },
         "anchor_day_1": { "type": "number", "description": "Day of month (1-31) for semi_monthly" },
         "anchor_day_2": { "type": "number", "description": "Day of month (1-31) for semi_monthly" },

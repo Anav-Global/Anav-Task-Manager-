@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 
 export const Sidebar: React.FC = () => {
   const { userDoc } = useAuth();
-  const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const isManager = userDoc?.role === 'manager';
 
   return (
     <aside className="w-60 bg-neutral-50 border-r border-neutral-200 flex flex-col justify-between py-6 px-3">
@@ -22,20 +22,6 @@ export const Sidebar: React.FC = () => {
         >
           <CheckSquare className="w-4 h-4" />
           <span>Tasks</span>
-        </NavLink>
-
-        <NavLink
-          to="/dashboard/reports"
-          className={({ isActive }) =>
-            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-              isActive
-                ? 'bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-xs'
-                : 'text-neutral-600 hover:bg-neutral-200/60 hover:text-neutral-900'
-            }`
-          }
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>Reports</span>
         </NavLink>
 
         <NavLink
@@ -66,7 +52,7 @@ export const Sidebar: React.FC = () => {
           <span>Groups</span>
         </NavLink>
 
-        {isPrivileged && (
+        {isManager && (
           <NavLink
             to="/dashboard/users"
             className={({ isActive }) =>
@@ -79,6 +65,22 @@ export const Sidebar: React.FC = () => {
           >
             <UserCog className="w-4 h-4" />
             <span>Users</span>
+          </NavLink>
+        )}
+
+        {isManager && (
+          <NavLink
+            to="/dashboard/reports"
+            className={({ isActive }) =>
+              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                isActive
+                  ? 'bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-xs'
+                  : 'text-neutral-600 hover:bg-neutral-200/60 hover:text-neutral-900'
+              }`
+            }
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Reports</span>
           </NavLink>
         )}
       </nav>
