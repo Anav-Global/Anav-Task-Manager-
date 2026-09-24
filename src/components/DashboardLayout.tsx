@@ -10,10 +10,10 @@ export const DashboardLayout: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-neutral-100 flex items-center justify-center">
+      <div className="min-h-screen bg-neutral-100 dark:bg-neutral-900 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-3 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
-          <span className="text-sm font-medium text-neutral-600">Verifying session...</span>
+          <div className="w-8 h-8 border-3 border-neutral-300 dark:border-neutral-700 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin" />
+          <span className="text-sm font-medium text-neutral-600 dark:text-neutral-400">Verifying session...</span>
         </div>
       </div>
     );
@@ -30,11 +30,11 @@ export const DashboardLayout: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-neutral-100">
+    <div className="min-h-screen flex flex-col bg-neutral-100 dark:bg-neutral-900 transition-colors">
       <Navbar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto p-6 md:p-8">
+        <main className="flex-1 overflow-y-auto p-6 md:p-8 bg-neutral-100 dark:bg-neutral-900">
           <div className="max-w-6xl mx-auto">
             <Outlet />
           </div>

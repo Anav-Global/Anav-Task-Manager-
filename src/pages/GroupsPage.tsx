@@ -208,8 +208,8 @@ export const GroupsPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Groups</h1>
-          <p className="text-sm text-neutral-500 mt-0.5">
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">Groups</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
             Client groupings and portfolio categories
           </p>
         </div>
@@ -231,19 +231,19 @@ export const GroupsPage: React.FC = () => {
       {blockedDeleteMessage && (
         <div
           id="blocked-delete-alert"
-          className="p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start justify-between gap-3 text-sm text-amber-900 shadow-xs"
+          className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start justify-between gap-3 text-sm text-amber-900 dark:text-amber-200 shadow-xs transition-colors"
         >
           <div className="flex items-start gap-2.5">
-            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
             <div className="space-y-1">
               <span className="font-semibold block">Deletion Blocked</span>
-              <p className="text-xs text-amber-800 leading-relaxed">{blockedDeleteMessage}</p>
+              <p className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">{blockedDeleteMessage}</p>
             </div>
           </div>
           <button
             type="button"
             onClick={() => setBlockedDeleteMessage(null)}
-            className="p-1 text-amber-600 hover:text-amber-900 rounded-md transition-colors"
+            className="p-1 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 rounded-md transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -251,42 +251,42 @@ export const GroupsPage: React.FC = () => {
       )}
 
       {/* Groups List */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs overflow-hidden transition-colors">
         {loading ? (
-          <div className="p-12 text-center text-neutral-500 text-sm">
-            <div className="w-6 h-6 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin mx-auto mb-2" />
+          <div className="p-12 text-center text-neutral-500 dark:text-neutral-400 text-sm">
+            <div className="w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-800 dark:border-t-neutral-100 rounded-full animate-spin mx-auto mb-2" />
             Loading groups...
           </div>
         ) : groups.length === 0 ? (
           <div className="p-12 text-center">
-            <FolderTree className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-neutral-800">No groups found</p>
-            <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+            <FolderTree className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">No groups found</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
               {isPrivileged
                 ? 'No client groups have been created yet. Click "Add Group" to create the first group.'
                 : 'No client groups are currently available in the database.'}
             </p>
           </div>
         ) : (
-          <div className="divide-y divide-neutral-200">
+          <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
             {groups.map((group) => {
               const clientCount = clientCountByGroupId.get(group.id) || 0;
 
               return (
                 <div
                   key={group.id}
-                  className="p-4 sm:p-5 flex items-center justify-between hover:bg-neutral-50/70 transition-colors"
+                  className="p-4 sm:p-5 flex items-center justify-between hover:bg-neutral-50/70 dark:hover:bg-neutral-700/50 transition-colors"
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    <div className="w-10 h-10 rounded-lg bg-neutral-100 border border-neutral-200 text-neutral-700 flex items-center justify-center shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-neutral-100 dark:bg-neutral-700 border border-neutral-200 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 flex items-center justify-center shrink-0">
                       <FolderTree className="w-5 h-5" />
                     </div>
                     <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-neutral-900 truncate">
+                      <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
                         {group.name}
                       </h3>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-neutral-500">
-                        <Users className="w-3.5 h-3.5 text-neutral-400" />
+                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
+                        <Users className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
                         <span>
                           {clientCount} {clientCount === 1 ? 'client' : 'clients'}
                         </span>
@@ -301,7 +301,7 @@ export const GroupsPage: React.FC = () => {
                         id={`edit-group-${group.id}`}
                         type="button"
                         onClick={() => openEditModal(group)}
-                        className="p-2 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-lg transition-colors cursor-pointer"
+                        className="p-2 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                         title="Edit Group"
                       >
                         <Edit2 className="w-4 h-4" />
@@ -310,7 +310,7 @@ export const GroupsPage: React.FC = () => {
                         id={`delete-group-${group.id}`}
                         type="button"
                         onClick={() => initiateDelete(group)}
-                        className="p-2 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                        className="p-2 text-neutral-500 dark:text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors cursor-pointer"
                         title="Delete Group"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -326,30 +326,30 @@ export const GroupsPage: React.FC = () => {
 
       {/* Add / Edit Group Modal (tl / manager only) */}
       {isModalOpen && isPrivileged && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-neutral-200 p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 mb-4">
-              <h2 className="text-lg font-bold text-neutral-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-md w-full border border-neutral-200 dark:border-neutral-700 p-6 transition-colors">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-700 mb-4">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
                 {editingGroup ? 'Edit Group' : 'Add Group'}
               </h2>
               <button
                 type="button"
                 onClick={closeModal}
-                className="p-1 text-neutral-400 hover:text-neutral-600 rounded-md transition-colors"
+                className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {formError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300">
                 {formError}
               </div>
             )}
 
             <form onSubmit={handleSaveGroup} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Group Name *
                 </label>
                 <input
@@ -359,7 +359,7 @@ export const GroupsPage: React.FC = () => {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Enterprise Clients"
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
@@ -368,7 +368,7 @@ export const GroupsPage: React.FC = () => {
                   type="button"
                   onClick={closeModal}
                   disabled={formSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-600 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>

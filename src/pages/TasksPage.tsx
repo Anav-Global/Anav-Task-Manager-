@@ -33,6 +33,7 @@ import {
   Power,
   Layers,
   X,
+  Filter,
 } from 'lucide-react';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +43,7 @@ import type {
   TaskTemplate,
   TaskComment,
   Client,
+  ClientGroup,
   UserDoc,
   TaskFrequency,
 } from '../types';
@@ -106,7 +108,11 @@ export const TasksPage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [templates, setTemplates] = useState<TaskTemplate[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
+  const [groups, setGroups] = useState<ClientGroup[]>([]);
   const [users, setUsers] = useState<UserDoc[]>([]);
+
+  // Group filter dropdown: 'all' | 'unassigned' | <groupId>
+  const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('all');
 
   // Restrict task assignees strictly to users with role === 'employee' (never tl or manager)
   const employeeUsers = useMemo(() => {
@@ -330,6 +336,18 @@ export const TasksPage: React.FC = () => {
       setClients(list);
     });
 
+    // Client Groups (to populate group filter dropdown)
+    const unsubGroups = onSnapshot(collection(db, 'client_groups'), (snapshot) => {
+      const list: ClientGroup[] = snapshot.docs.map((d) => ({
+        id: d.id,
+        name: d.data().name || '',
+        created_at: d.data().created_at,
+        created_by: d.data().created_by || '',
+      }));
+      list.sort((a, b) => a.name.localeCompare(b.name));
+      setGroups(list);
+    });
+
     // Users (to resolve employee/assignee names)
     const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
       const list: UserDoc[] = snapshot.docs.map((d) => {
@@ -365,6 +383,7 @@ export const TasksPage: React.FC = () => {
       unsubTasks();
       unsubTemplates();
       unsubClients();
+      unsubGroups();
       unsubUsers();
       unsubComments();
     };
@@ -504,17 +523,43 @@ export const TasksPage: React.FC = () => {
     return map;
   }, [comments]);
 
-  // Filter tasks according to viewFilter ("my" vs "all")
+  // Selected group label helper
+  const selectedGroupName = useMemo(() => {
+    if (selectedGroupFilter === 'all') return null;
+    if (selectedGroupFilter === 'unassigned') return 'Unassigned';
+    const match = groups.find((g) => g.id === selectedGroupFilter);
+    return match ? match.name : 'Selected Group';
+  }, [selectedGroupFilter, groups]);
+
+  // Filter tasks according to viewFilter ("my" vs "all") and selectedGroupFilter ('all' | 'unassigned' | groupId)
+  // Each task has a client_id, resolved via clientsMap to the client document's group_id.
   // Tasks with status "skipped" must be excluded from all default task list views (My Tasks, All Tasks,
   // both recurring-grouped and one-off sections) — treat them as if they don't exist for display purposes,
   // on both employee and tl/manager views.
   const filteredTasks = useMemo(() => {
     const unskippedTasks = tasks.filter((t) => t.status !== 'skipped');
-    if (viewFilter === 'my') {
-      return unskippedTasks.filter((t) => t.assigned_to === user?.uid);
+
+    // 1. View filter ('my' vs 'all')
+    const viewFiltered =
+      viewFilter === 'my'
+        ? unskippedTasks.filter((t) => t.assigned_to === user?.uid)
+        : unskippedTasks;
+
+    // 2. Group filter ('all', 'unassigned', or specific groupId)
+    if (selectedGroupFilter === 'all') {
+      return viewFiltered;
     }
-    return unskippedTasks;
-  }, [tasks, viewFilter, user?.uid]);
+
+    return viewFiltered.filter((t) => {
+      const client = clientsMap[t.client_id];
+      const clientGroupId = client?.group_id || null;
+
+      if (selectedGroupFilter === 'unassigned') {
+        return !clientGroupId;
+      }
+      return clientGroupId === selectedGroupFilter;
+    });
+  }, [tasks, viewFilter, user?.uid, selectedGroupFilter, clientsMap]);
 
   // Group recurring tasks by template_id
   const templateGroups = useMemo(() => {
@@ -567,8 +612,20 @@ export const TasksPage: React.FC = () => {
       const openCount = groupTasks.filter((t) => t.status === 'pending').length;
       const overdueCount = groupTasks.filter((t) => isTaskOverdue(t)).length;
 
-      // Only skip empty template group if viewing 'my'
-      if (groupTasks.length > 0 || (viewFilter === 'all' && tpl && tpl.active)) {
+      // Group filter check:
+      // If template has tasks, all tasks inside groupTasks already match the selected group.
+      // If template has 0 tasks, check if the template itself belongs to the selected group.
+      const tplClientId = tpl?.client_id || groupTasks[0]?.client_id;
+      const tplGroupId = tplClientId ? clientsMap[tplClientId]?.group_id || null : null;
+      const tplMatchesGroup =
+        selectedGroupFilter === 'all'
+          ? true
+          : selectedGroupFilter === 'unassigned'
+          ? !tplGroupId
+          : tplGroupId === selectedGroupFilter;
+
+      // Only show if it matches group and (has tasks OR is an active template when viewing 'all')
+      if (tplMatchesGroup && (groupTasks.length > 0 || (viewFilter === 'all' && tpl && tpl.active))) {
         groupsList.push({
           template: tpl,
           templateId: tplId,
@@ -584,7 +641,7 @@ export const TasksPage: React.FC = () => {
     groupsList.sort((a, b) => a.title.localeCompare(b.title));
 
     return groupsList;
-  }, [filteredTasks, templates, viewFilter]);
+  }, [filteredTasks, templates, viewFilter, selectedGroupFilter, clientsMap]);
 
   // One-off tasks (template_id == null), sorted by due_date ascending
   const oneOffTasks = useMemo(() => {
@@ -1056,15 +1113,15 @@ export const TasksPage: React.FC = () => {
     <div className="space-y-8">
       {/* Route Guard Redirect Alert Banner */}
       {bannerMessage && (
-        <div className="flex items-center justify-between gap-3 p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-sm shadow-xs animate-in fade-in duration-200">
+        <div className="flex items-center justify-between gap-3 p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 rounded-xl text-sm shadow-xs animate-in fade-in duration-200 transition-colors">
           <div className="flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-600 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <span className="font-medium">{bannerMessage}</span>
           </div>
           <button
             type="button"
             onClick={() => setBannerMessage(null)}
-            className="p-1 rounded-lg text-amber-700 hover:bg-amber-100 hover:text-amber-900 transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 hover:text-amber-900 dark:hover:text-amber-200 transition-colors cursor-pointer"
             title="Dismiss message"
           >
             <X className="w-4 h-4" />
@@ -1076,36 +1133,58 @@ export const TasksPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+            <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
               Tasks
             </h1>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-200 text-neutral-800">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200">
                 {totalOpenCount} open
               </span>
               {totalOverdueCount > 0 && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800">
                   {totalOverdueCount} overdue
                 </span>
               )}
             </div>
           </div>
-          <p className="text-sm text-neutral-500 mt-1">
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
             Track recurring client responsibilities, deadlines, and one-off workflows.
           </p>
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Group Filter */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 text-sm text-neutral-600 dark:text-neutral-300 font-medium">
+              <Filter className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
+              <span>Group:</span>
+            </div>
+            <select
+              id="tasks-group-filter"
+              value={selectedGroupFilter}
+              onChange={(e) => setSelectedGroupFilter(e.target.value)}
+              className="px-3 py-1.5 text-sm bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-blue cursor-pointer transition-colors"
+            >
+              <option value="all">All Groups</option>
+              <option value="unassigned">Unassigned</option>
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* View Filter Toggle (My Tasks vs All Tasks) */}
-          <div className="inline-flex rounded-lg bg-neutral-200 p-0.5 text-xs font-medium">
+          <div className="inline-flex rounded-lg bg-neutral-200 dark:bg-neutral-700 p-0.5 text-xs font-medium">
             <button
               type="button"
               onClick={() => setViewFilter('my')}
               className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 viewFilter === 'my'
-                  ? 'bg-white text-neutral-900 shadow-xs font-semibold'
-                  : 'text-neutral-600 hover:text-neutral-900'
+                  ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-xs font-semibold'
+                  : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100'
               }`}
             >
               My Tasks
@@ -1115,8 +1194,8 @@ export const TasksPage: React.FC = () => {
               onClick={() => setViewFilter('all')}
               className={`px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
                 viewFilter === 'all'
-                  ? 'bg-white text-neutral-900 shadow-xs font-semibold'
-                  : 'text-neutral-600 hover:text-neutral-900'
+                  ? 'bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-xs font-semibold'
+                  : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100'
               }`}
             >
               All Tasks
@@ -1132,7 +1211,7 @@ export const TasksPage: React.FC = () => {
                   setOneOffModalError(null);
                   setIsOneOffModalOpen(true);
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-neutral-700 dark:text-neutral-200 bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors shadow-xs cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Add One-Off Task</span>
@@ -1153,17 +1232,23 @@ export const TasksPage: React.FC = () => {
 
       {loading ? (
         <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <div className="w-7 h-7 border-2 border-neutral-300 border-t-neutral-900 rounded-full animate-spin" />
-          <span className="text-xs font-medium text-neutral-500">Loading tasks...</span>
+          <div className="w-7 h-7 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-900 dark:border-t-neutral-100 rounded-full animate-spin" />
+          <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Loading tasks...</span>
         </div>
       ) : filteredTasks.length === 0 && templateGroups.length === 0 ? (
-        <div className="bg-white border border-neutral-200 rounded-xl p-12 text-center shadow-xs">
-          <CheckSquare className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-          <h3 className="text-base font-semibold text-neutral-800">
-            {viewFilter === 'my' ? 'No tasks assigned to you' : 'No tasks found'}
+        <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl p-12 text-center shadow-xs transition-colors">
+          <CheckSquare className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+          <h3 className="text-base font-semibold text-neutral-800 dark:text-neutral-100">
+            {selectedGroupFilter !== 'all'
+              ? 'No tasks found for the selected group and view'
+              : viewFilter === 'my'
+              ? 'No tasks assigned to you'
+              : 'No tasks found'}
           </h3>
-          <p className="text-sm text-neutral-500 mt-1 max-w-sm mx-auto">
-            {viewFilter === 'my'
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
+            {selectedGroupFilter !== 'all'
+              ? `No tasks found for "${selectedGroupName}" in this view. Try selecting "All Groups" or another view.`
+              : viewFilter === 'my'
               ? 'You have completed all your tasks or no tasks are currently assigned to your account.'
               : 'Add recurring templates or one-off tasks to start tracking team workflows.'}
           </p>
@@ -1172,16 +1257,18 @@ export const TasksPage: React.FC = () => {
         <div className="space-y-10">
           {/* SECTION 1: Recurring Tasks (Grouped by Template) */}
           <div className="space-y-6">
-            <div className="border-b border-neutral-200 pb-2">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
-                <RefreshCw className="w-4 h-4 text-neutral-400" />
+            <div className="border-b border-neutral-200 dark:border-neutral-700 pb-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
                 <span>Recurring Tasks (by Template)</span>
               </h2>
             </div>
 
             {templateGroups.length === 0 ? (
-              <p className="text-xs text-neutral-400 italic py-2">
-                No recurring tasks found for this view filter.
+              <p className="text-xs text-neutral-400 dark:text-neutral-500 italic py-2">
+                {selectedGroupFilter !== 'all'
+                  ? `No recurring tasks found for "${selectedGroupName}" in this view.`
+                  : 'No recurring tasks found for this view filter.'}
               </p>
             ) : (
               <div className="space-y-6">
@@ -1191,12 +1278,12 @@ export const TasksPage: React.FC = () => {
                   return (
                     <div
                       key={group.templateId}
-                      className="bg-white border border-neutral-200 rounded-xl overflow-hidden shadow-xs"
+                      className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl overflow-hidden shadow-xs transition-colors"
                     >
                       {/* Template Header */}
-                      <div className="bg-neutral-50/80 px-4 py-3 border-b border-neutral-200 flex flex-wrap items-center justify-between gap-3">
+                      <div className="bg-neutral-50/80 dark:bg-neutral-800/90 px-4 py-3 border-b border-neutral-200 dark:border-neutral-700 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-2.5 min-w-0">
-                          <h3 className="text-sm font-bold text-neutral-900 truncate">
+                          <h3 className="text-sm font-bold text-neutral-900 dark:text-neutral-100 truncate">
                             {group.title}
                           </h3>
 
@@ -1205,8 +1292,8 @@ export const TasksPage: React.FC = () => {
                             <span
                               className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
                                 group.overdueCount > 0
-                                  ? 'bg-red-100 text-red-700 border border-red-200'
-                                  : 'bg-neutral-200 text-neutral-800'
+                                  ? 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800'
+                                  : 'bg-neutral-200 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200'
                               }`}
                             >
                               {group.overdueCount > 0
@@ -1217,28 +1304,28 @@ export const TasksPage: React.FC = () => {
 
                           {/* Frequency Badge */}
                           {tpl && (
-                            <span className="capitalize inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">
+                            <span className="capitalize inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-600">
                               {tpl.frequency === 'semi_monthly' ? 'Semi-Monthly' : tpl.frequency}
                             </span>
                           )}
 
                           {tpl && !tpl.active && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800">
                               Inactive
                             </span>
                           )}
                         </div>
 
                         {/* Template metadata & privileged management */}
-                        <div className="flex items-center gap-3 text-xs text-neutral-500">
+                        <div className="flex items-center gap-3 text-xs text-neutral-500 dark:text-neutral-400">
                           {tpl && (
                             <div className="hidden sm:flex items-center gap-3">
                               <span className="flex items-center gap-1 truncate max-w-[140px]" title={clientsMap[tpl.client_id]?.name}>
-                                <Building className="w-3.5 h-3.5 text-neutral-400" />
+                                <Building className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
                                 <span className="truncate">{clientsMap[tpl.client_id]?.name || 'Client'}</span>
                               </span>
                               <span className="flex items-center gap-1 truncate max-w-[140px]" title={usersMap[tpl.assigned_to]?.name}>
-                                <User className="w-3.5 h-3.5 text-neutral-400" />
+                                <User className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
                                 <span className="truncate">{usersMap[tpl.assigned_to]?.name || 'Assignee'}</span>
                               </span>
                             </div>
@@ -1249,7 +1336,7 @@ export const TasksPage: React.FC = () => {
                               type="button"
                               onClick={(e) => handleOpenEditTemplate(tpl, e)}
                               title="Edit Template"
-                              className="p-1 text-neutral-400 hover:text-neutral-800 rounded-md hover:bg-neutral-200/60 transition-colors cursor-pointer"
+                              className="p-1 text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded-md hover:bg-neutral-200/60 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
@@ -1259,18 +1346,18 @@ export const TasksPage: React.FC = () => {
 
                       {/* Template Description if any */}
                       {tpl?.description && (
-                        <div className="px-4 py-2 text-xs text-neutral-500 bg-neutral-50/30 border-b border-neutral-100">
+                        <div className="px-4 py-2 text-xs text-neutral-500 dark:text-neutral-400 bg-neutral-50/30 dark:bg-neutral-800/40 border-b border-neutral-100 dark:border-neutral-700">
                           {tpl.description}
                         </div>
                       )}
 
                       {/* Group's Task Instances List */}
                       {group.tasks.length === 0 ? (
-                        <div className="p-4 text-xs text-neutral-400 italic text-center">
+                        <div className="p-4 text-xs text-neutral-400 dark:text-neutral-500 italic text-center">
                           No tasks currently matching your filter for this template.
                         </div>
                       ) : (
-                        <div className="divide-y divide-neutral-100">
+                        <div className="divide-y divide-neutral-100 dark:divide-neutral-700">
                           {group.tasks.map((task) => (
                             <TaskRowItem
                               key={task.id}
@@ -1305,22 +1392,24 @@ export const TasksPage: React.FC = () => {
 
           {/* SECTION 2: One-Off Tasks (template_id == null) */}
           <div className="space-y-4">
-            <div className="border-b border-neutral-200 pb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 flex items-center gap-2">
-                <CheckSquare className="w-4 h-4 text-neutral-400" />
+            <div className="border-b border-neutral-200 dark:border-neutral-700 pb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-neutral-500 dark:text-neutral-400 flex items-center gap-2">
+                <CheckSquare className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
                 <span>One-Off Tasks</span>
-                <span className="text-xs font-normal text-neutral-400 lowercase">
+                <span className="text-xs font-normal text-neutral-400 dark:text-neutral-500 lowercase">
                   ({oneOffTasks.length})
                 </span>
               </h2>
             </div>
 
             {oneOffTasks.length === 0 ? (
-              <div className="bg-white border border-dashed border-neutral-200 rounded-xl p-6 text-center text-xs text-neutral-400">
-                No one-off tasks found.
+              <div className="bg-white dark:bg-neutral-800 border border-dashed border-neutral-200 dark:border-neutral-700 rounded-xl p-6 text-center text-xs text-neutral-400 dark:text-neutral-500 transition-colors">
+                {selectedGroupFilter !== 'all'
+                  ? `No one-off tasks found for "${selectedGroupName}" in this view.`
+                  : 'No one-off tasks found.'}
               </div>
             ) : (
-              <div className="bg-white border border-neutral-200 rounded-xl divide-y divide-neutral-100 overflow-hidden shadow-xs">
+              <div className="bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 rounded-xl divide-y divide-neutral-100 dark:divide-neutral-700 overflow-hidden shadow-xs transition-colors">
                 {oneOffTasks.map((task) => (
                   <TaskRowItem
                     key={task.id}
@@ -1354,24 +1443,24 @@ export const TasksPage: React.FC = () => {
 
       {/* 1. Add Task Template Modal */}
       {isTemplateModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200">
-            <h3 className="text-lg font-bold text-neutral-900 mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200 dark:border-neutral-700 transition-colors">
+            <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-1">
               Add Task Template
             </h3>
-            <p className="text-xs text-neutral-500 mb-5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5">
               Create a recurring schedule that automatically generates pending tasks for each cycle.
             </p>
 
             {templateModalError && (
-              <div className="p-3 mb-4 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+              <div className="p-3 mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-medium border border-red-200 dark:border-red-800">
                 {templateModalError}
               </div>
             )}
 
             <form onSubmit={handleCreateTemplate} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Title *
                 </label>
                 <input
@@ -1380,12 +1469,12 @@ export const TasksPage: React.FC = () => {
                   value={templateFormTitle}
                   onChange={(e) => setTemplateFormTitle(e.target.value)}
                   placeholder="e.g. Monthly Bank Reconciliation"
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Description (optional)
                 </label>
                 <textarea
@@ -1393,20 +1482,20 @@ export const TasksPage: React.FC = () => {
                   value={templateFormDescription}
                   onChange={(e) => setTemplateFormDescription(e.target.value)}
                   placeholder="Detailed instructions or expectations..."
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Client *
                   </label>
                   <select
                     required
                     value={templateFormClientId}
                     onChange={(e) => setTemplateFormClientId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select a client</option>
                     {clients.map((c) => (
@@ -1418,14 +1507,14 @@ export const TasksPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Assigned To *
                   </label>
                   <select
                     required
                     value={templateFormAssignee}
                     onChange={(e) => setTemplateFormAssignee(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select an employee</option>
                     {employeeUsers.map((u) => (
@@ -1438,13 +1527,13 @@ export const TasksPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Frequency *
                 </label>
                 <select
                   value={templateFormFrequency}
                   onChange={(e) => setTemplateFormFrequency(e.target.value as TaskFrequency)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 >
                   <option value="daily">Daily</option>
                   <option value="weekly">Weekly</option>
@@ -1458,7 +1547,7 @@ export const TasksPage: React.FC = () => {
               {/* Conditional Date Picker(s) based on Frequency */}
               {templateFormFrequency !== 'semi_monthly' ? (
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                     First due date — this date sets the recurring pattern going forward *
                   </label>
                   <input
@@ -1466,23 +1555,23 @@ export const TasksPage: React.FC = () => {
                     required
                     value={templateFormAnchorDate}
                     onChange={(e) => setTemplateFormAnchorDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   />
                   {templateFormAnchorWeekendNotice && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <span>{templateFormAnchorWeekendNotice}</span>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     The day-of-month from each date will set the two recurring anchor days.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                         First monthly occurrence *
                       </label>
                       <input
@@ -1490,18 +1579,18 @@ export const TasksPage: React.FC = () => {
                         required
                         value={templateFormSemiDate1}
                         onChange={(e) => setTemplateFormSemiDate1(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                        className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                       />
                       {templateFormSemi1WeekendNotice && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                           <span>{templateFormSemi1WeekendNotice}</span>
                         </div>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                         Second monthly occurrence *
                       </label>
                       <input
@@ -1509,11 +1598,11 @@ export const TasksPage: React.FC = () => {
                         required
                         value={templateFormSemiDate2}
                         onChange={(e) => setTemplateFormSemiDate2(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                        className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                       />
                       {templateFormSemi2WeekendNotice && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                           <span>{templateFormSemi2WeekendNotice}</span>
                         </div>
                       )}
@@ -1522,11 +1611,11 @@ export const TasksPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-700">
                 <button
                   type="button"
                   onClick={() => setIsTemplateModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 rounded-lg cursor-pointer"
+                  className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1545,24 +1634,24 @@ export const TasksPage: React.FC = () => {
 
       {/* 2. Edit Task Template Modal */}
       {editingTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200">
-            <h3 className="text-lg font-bold text-neutral-900 mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200 dark:border-neutral-700 transition-colors">
+            <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-1">
               Edit Task Template
             </h3>
-            <p className="text-xs text-neutral-500 mb-5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5">
               Update assignee, frequency, or deactivation status. (Templates are never permanently deleted to safeguard historical task integrity).
             </p>
 
             {editTemplateError && (
-              <div className="p-3 mb-4 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+              <div className="p-3 mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-medium border border-red-200 dark:border-red-800">
                 {editTemplateError}
               </div>
             )}
 
             <form onSubmit={handleUpdateTemplate} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Title *
                 </label>
                 <input
@@ -1570,32 +1659,32 @@ export const TasksPage: React.FC = () => {
                   required
                   value={editTemplateTitle}
                   onChange={(e) => setEditTemplateTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Description
                 </label>
                 <textarea
                   rows={2}
                   value={editTemplateDescription}
                   onChange={(e) => setEditTemplateDescription(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Assigned To *
                   </label>
                   <select
                     required
                     value={editTemplateAssignee}
                     onChange={(e) => setEditTemplateAssignee(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select an employee</option>
                     {employeeUsers.map((u) => (
@@ -1607,13 +1696,13 @@ export const TasksPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Frequency *
                   </label>
                   <select
                     value={editTemplateFrequency}
                     onChange={(e) => setEditTemplateFrequency(e.target.value as TaskFrequency)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
@@ -1628,7 +1717,7 @@ export const TasksPage: React.FC = () => {
               {/* Conditional Date Picker(s) based on Frequency */}
               {editTemplateFrequency !== 'semi_monthly' ? (
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                     First due date — this date sets the recurring pattern going forward *
                   </label>
                   <input
@@ -1636,23 +1725,23 @@ export const TasksPage: React.FC = () => {
                     required
                     value={editTemplateAnchorDate}
                     onChange={(e) => setEditTemplateAnchorDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   />
                   {editTemplateAnchorWeekendNotice && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <span>{editTemplateAnchorWeekendNotice}</span>
                     </div>
                   )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <p className="text-xs text-neutral-500">
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400">
                     The day-of-month from each date will set the two recurring anchor days.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                         First monthly occurrence *
                       </label>
                       <input
@@ -1660,18 +1749,18 @@ export const TasksPage: React.FC = () => {
                         required
                         value={editTemplateSemiDate1}
                         onChange={(e) => setEditTemplateSemiDate1(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                        className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                       />
                       {editTemplateSemi1WeekendNotice && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                           <span>{editTemplateSemi1WeekendNotice}</span>
                         </div>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-semibold text-neutral-700 mb-1">
+                      <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 mb-1">
                         Second monthly occurrence *
                       </label>
                       <input
@@ -1679,11 +1768,11 @@ export const TasksPage: React.FC = () => {
                         required
                         value={editTemplateSemiDate2}
                         onChange={(e) => setEditTemplateSemiDate2(e.target.value)}
-                        className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                        className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                       />
                       {editTemplateSemi2WeekendNotice && (
-                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                        <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                           <span>{editTemplateSemi2WeekendNotice}</span>
                         </div>
                       )}
@@ -1693,12 +1782,12 @@ export const TasksPage: React.FC = () => {
               )}
 
               {/* Active Toggle */}
-              <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 border border-neutral-200">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-neutral-50 dark:bg-neutral-700/60 border border-neutral-200 dark:border-neutral-600">
                 <div>
-                  <span className="text-xs font-semibold text-neutral-800 block">
+                  <span className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 block">
                     Template Status
                   </span>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-neutral-500 dark:text-neutral-400">
                     {editTemplateActive
                       ? 'Active (generates upcoming cycle tasks automatically)'
                       : 'Deactivated (no further cycle tasks will be generated)'}
@@ -1708,7 +1797,7 @@ export const TasksPage: React.FC = () => {
                   type="button"
                   onClick={() => setEditTemplateActive(!editTemplateActive)}
                   className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                    editTemplateActive ? 'bg-brand-purple' : 'bg-neutral-300'
+                    editTemplateActive ? 'bg-brand-purple' : 'bg-neutral-300 dark:bg-neutral-600'
                   }`}
                 >
                   <span
@@ -1719,12 +1808,12 @@ export const TasksPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between pt-4 border-t border-neutral-100">
+              <div className="flex items-center justify-between pt-4 border-t border-neutral-100 dark:border-neutral-700">
                 {editingTemplate.active && (
                   <button
                     type="button"
                     onClick={() => handleDeactivateTemplate(editingTemplate)}
-                    className="inline-flex items-center gap-1 text-xs text-amber-700 hover:text-amber-900 font-medium cursor-pointer"
+                    className="inline-flex items-center gap-1 text-xs text-amber-700 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 font-medium cursor-pointer"
                   >
                     <Power className="w-3.5 h-3.5" />
                     Deactivate Template
@@ -1734,7 +1823,7 @@ export const TasksPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setEditingTemplate(null)}
-                    className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 rounded-lg cursor-pointer"
+                    className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                   >
                     Cancel
                   </button>
@@ -1754,24 +1843,24 @@ export const TasksPage: React.FC = () => {
 
       {/* 3. Add One-Off Task Modal */}
       {isOneOffModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200">
-            <h3 className="text-lg font-bold text-neutral-900 mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200 dark:border-neutral-700 transition-colors">
+            <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-1">
               Add One-Off Task
             </h3>
-            <p className="text-xs text-neutral-500 mb-5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5">
               Create a standalone, non-recurring task with a specific due date.
             </p>
 
             {oneOffModalError && (
-              <div className="p-3 mb-4 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+              <div className="p-3 mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-medium border border-red-200 dark:border-red-800">
                 {oneOffModalError}
               </div>
             )}
 
             <form onSubmit={handleCreateOneOff} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Title *
                 </label>
                 <input
@@ -1780,12 +1869,12 @@ export const TasksPage: React.FC = () => {
                   value={oneOffTitle}
                   onChange={(e) => setOneOffTitle(e.target.value)}
                   placeholder="e.g. Prepare Tax Audit Dossier"
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Description (optional)
                 </label>
                 <textarea
@@ -1793,20 +1882,20 @@ export const TasksPage: React.FC = () => {
                   value={oneOffDescription}
                   onChange={(e) => setOneOffDescription(e.target.value)}
                   placeholder="Task details and deliverables..."
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Client *
                   </label>
                   <select
                     required
                     value={oneOffClientId}
                     onChange={(e) => setOneOffClientId(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select a client</option>
                     {clients.map((c) => (
@@ -1818,14 +1907,14 @@ export const TasksPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Assigned To *
                   </label>
                   <select
                     required
                     value={oneOffAssignee}
                     onChange={(e) => setOneOffAssignee(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select an employee</option>
                     {employeeUsers.map((u) => (
@@ -1838,7 +1927,7 @@ export const TasksPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Due Date *
                 </label>
                 <input
@@ -1846,21 +1935,21 @@ export const TasksPage: React.FC = () => {
                   required
                   value={oneOffDueDate}
                   onChange={(e) => setOneOffDueDate(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 />
                 {oneOffWeekendNotice && (
-                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                     <span>{oneOffWeekendNotice}</span>
                   </div>
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-700">
                 <button
                   type="button"
                   onClick={() => setIsOneOffModalOpen(false)}
-                  className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 rounded-lg cursor-pointer"
+                  className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -1879,24 +1968,24 @@ export const TasksPage: React.FC = () => {
 
       {/* 4. Edit / Reassign Task Modal (tl/manager) */}
       {editingTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="bg-white rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200">
-            <h3 className="text-lg font-bold text-neutral-900 mb-1">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl max-w-lg w-full p-6 shadow-xl border border-neutral-200 dark:border-neutral-700 transition-colors">
+            <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100 mb-1">
               Edit / Reassign Task
             </h3>
-            <p className="text-xs text-neutral-500 mb-5">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mb-5">
               Modify assignee, deadline, or details for this task.
             </p>
 
             {editTaskError && (
-              <div className="p-3 mb-4 rounded-lg bg-red-50 text-red-700 text-xs font-medium border border-red-200">
+              <div className="p-3 mb-4 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 text-xs font-medium border border-red-200 dark:border-red-800">
                 {editTaskError}
               </div>
             )}
 
             <form onSubmit={handleUpdateTask} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Title *
                 </label>
                 <input
@@ -1904,32 +1993,32 @@ export const TasksPage: React.FC = () => {
                   required
                   value={editTaskTitle}
                   onChange={(e) => setEditTaskTitle(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Description
                 </label>
                 <textarea
                   rows={2}
                   value={editTaskDescription}
                   onChange={(e) => setEditTaskDescription(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Reassign To *
                   </label>
                   <select
                     required
                     value={editTaskAssignee}
                     onChange={(e) => setEditTaskAssignee(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select an employee</option>
                     {employeeUsers.map((u) => (
@@ -1941,7 +2030,7 @@ export const TasksPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                     Due Date & Time *
                   </label>
                   <input
@@ -1949,22 +2038,22 @@ export const TasksPage: React.FC = () => {
                     required
                     value={editTaskDueDate}
                     onChange={(e) => setEditTaskDueDate(e.target.value)}
-                    className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                    className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   />
                   {editTaskWeekendNotice && (
-                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="mt-2 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                       <span>{editTaskWeekendNotice}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100">
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-neutral-100 dark:border-neutral-700">
                 <button
                   type="button"
                   onClick={() => setEditingTask(null)}
-                  className="px-4 py-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 rounded-lg cursor-pointer"
+                  className="px-4 py-2 text-sm font-medium text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-lg transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
@@ -2045,14 +2134,14 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
   const isAssignedToMe = task.assigned_to === currentUserId;
 
   return (
-    <div className="p-4 hover:bg-neutral-50/50 transition-colors">
+    <div className="p-4 hover:bg-neutral-50/50 dark:hover:bg-neutral-700/30 transition-colors">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Left Column: Title & Metadata */}
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-2">
             <h4
               className={`text-sm font-semibold truncate ${
-                isDone ? 'text-neutral-500 line-through' : 'text-neutral-900'
+                isDone ? 'text-neutral-400 dark:text-neutral-500 line-through' : 'text-neutral-900 dark:text-neutral-100'
               }`}
             >
               {task.title}
@@ -2060,20 +2149,20 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
 
             {/* Status indicator badge */}
             {isDone ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-600 border border-neutral-200">
-                <CheckCircle2 className="w-3 h-3 text-neutral-500" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 dark:bg-neutral-700/60 text-neutral-600 dark:text-neutral-300 border border-neutral-200 dark:border-neutral-600">
+                <CheckCircle2 className="w-3 h-3 text-neutral-500 dark:text-neutral-400" />
                 <span>
                   Done {task.completed_at ? `• ${formatDisplayDate(task.completed_at)}` : ''}
                 </span>
               </span>
             ) : isOverdue ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 border border-red-200">
-                <AlertCircle className="w-3 h-3 text-red-600" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-red-100 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800">
+                <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-400" />
                 <span>Overdue</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                <Clock className="w-3 h-3 text-emerald-600" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800">
+                <Clock className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
                 <span>Pending</span>
               </span>
             )}
@@ -2081,28 +2170,28 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
 
           {/* Description snippet if present */}
           {task.description && (
-            <p className="text-xs text-neutral-500 line-clamp-2">
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 line-clamp-2">
               {task.description}
             </p>
           )}
 
           {/* Metadata badges: Client, Assignee, Due Date */}
-          <div className="flex flex-wrap items-center gap-3 pt-0.5 text-xs text-neutral-500">
+          <div className="flex flex-wrap items-center gap-3 pt-0.5 text-xs text-neutral-500 dark:text-neutral-400">
             <span className="inline-flex items-center gap-1">
-              <Building className="w-3.5 h-3.5 text-neutral-400" />
-              <span className="font-medium text-neutral-700">{clientName}</span>
+              <Building className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
+              <span className="font-medium text-neutral-700 dark:text-neutral-200">{clientName}</span>
             </span>
 
             <span className="inline-flex items-center gap-1">
-              <User className="w-3.5 h-3.5 text-neutral-400" />
-              <span className={isAssignedToMe ? 'font-semibold text-neutral-900' : 'text-neutral-600'}>
+              <User className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
+              <span className={isAssignedToMe ? 'font-semibold text-neutral-900 dark:text-neutral-100' : 'text-neutral-600 dark:text-neutral-300'}>
                 {assignedName} {isAssignedToMe ? '(You)' : ''}
               </span>
             </span>
 
             <span className="inline-flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-neutral-400" />
-              <span className={isOverdue ? 'text-red-600 font-medium' : 'text-neutral-600'}>
+              <Calendar className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
+              <span className={isOverdue ? 'text-red-600 dark:text-red-400 font-medium' : 'text-neutral-600 dark:text-neutral-300'}>
                 Due {formatDisplayDate(task.due_date)}
               </span>
             </span>
@@ -2129,7 +2218,7 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
               type="button"
               onClick={onEditTask}
               title="Edit or reassign task"
-              className="p-1.5 text-neutral-400 hover:text-neutral-800 rounded-md hover:bg-neutral-100 transition-colors cursor-pointer"
+              className="p-1.5 text-neutral-400 hover:text-neutral-800 dark:hover:text-neutral-200 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
             >
               <Edit2 className="w-3.5 h-3.5" />
             </button>
@@ -2141,7 +2230,7 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
               type="button"
               onClick={onDeleteTask}
               title="Delete task"
-              className="p-1.5 text-neutral-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+              className="p-1.5 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
@@ -2153,16 +2242,16 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
             onClick={onToggleComments}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors cursor-pointer ${
               isCommentsOpen
-                ? 'bg-neutral-100 text-neutral-900 border-neutral-300'
-                : 'text-neutral-600 hover:text-neutral-900 border-neutral-200 hover:bg-neutral-50'
+                ? 'bg-neutral-100 dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 border-neutral-300 dark:border-neutral-600'
+                : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-100 border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-700'
             }`}
           >
             <MessageSquare className="w-3.5 h-3.5" />
             <span>Comments ({comments.length})</span>
             {isCommentsOpen ? (
-              <ChevronUp className="w-3 h-3 text-neutral-400" />
+              <ChevronUp className="w-3 h-3 text-neutral-400 dark:text-neutral-500" />
             ) : (
-              <ChevronDown className="w-3 h-3 text-neutral-400" />
+              <ChevronDown className="w-3 h-3 text-neutral-400 dark:text-neutral-500" />
             )}
           </button>
         </div>
@@ -2170,15 +2259,15 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
 
       {/* Collapsible Comments Section */}
       {isCommentsOpen && (
-        <div className="mt-4 pt-4 border-t border-neutral-200/70 bg-neutral-50/50 rounded-lg p-3 space-y-3">
-          <h5 className="text-xs font-semibold text-neutral-700 uppercase tracking-wider flex items-center gap-1.5">
-            <MessageSquare className="w-3.5 h-3.5 text-neutral-400" />
+        <div className="mt-4 pt-4 border-t border-neutral-200/70 dark:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/40 rounded-lg p-3 space-y-3 transition-colors">
+          <h5 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider flex items-center gap-1.5">
+            <MessageSquare className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
             <span>Task Comments</span>
           </h5>
 
           {/* Comment list */}
           {comments.length === 0 ? (
-            <p className="text-xs text-neutral-400 italic">No comments yet.</p>
+            <p className="text-xs text-neutral-400 dark:text-neutral-500 italic">No comments yet.</p>
           ) : (
             <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
               {comments.map((comment) => {
@@ -2187,17 +2276,17 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
                 return (
                   <div
                     key={comment.id}
-                    className="p-2.5 rounded-md bg-white border border-neutral-200 text-xs shadow-2xs space-y-1"
+                    className="p-2.5 rounded-md bg-white dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-xs shadow-2xs space-y-1 transition-colors"
                   >
-                    <div className="flex items-center justify-between gap-2 text-neutral-500">
-                      <span className="font-semibold text-neutral-800">
+                    <div className="flex items-center justify-between gap-2 text-neutral-500 dark:text-neutral-400">
+                      <span className="font-semibold text-neutral-800 dark:text-neutral-200">
                         {authorName}
                       </span>
-                      <span className="text-[11px] text-neutral-400">
+                      <span className="text-[11px] text-neutral-400 dark:text-neutral-500">
                         {formatDisplayDateTime(comment.timestamp)}
                       </span>
                     </div>
-                    <p className="text-neutral-700 whitespace-pre-wrap">{comment.text}</p>
+                    <p className="text-neutral-700 dark:text-neutral-300 whitespace-pre-wrap">{comment.text}</p>
                   </div>
                 );
               })}
@@ -2217,7 +2306,7 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
                 }
               }}
               placeholder="Write a comment..."
-              className="flex-1 px-3 py-1.5 text-xs bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+              className="flex-1 px-3 py-1.5 text-xs bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-brand-blue"
             />
             <button
               type="button"

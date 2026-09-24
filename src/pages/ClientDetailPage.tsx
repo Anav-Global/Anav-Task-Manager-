@@ -420,8 +420,8 @@ export const ClientDetailPage: React.FC = () => {
   // Loading state
   if (clientLoading) {
     return (
-      <div className="p-16 text-center text-neutral-500 text-sm">
-        <div className="w-6 h-6 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin mx-auto mb-3" />
+      <div className="p-16 text-center text-neutral-500 dark:text-neutral-400 text-sm">
+        <div className="w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-800 dark:border-t-neutral-100 rounded-full animate-spin mx-auto mb-3" />
         Loading client details...
       </div>
     );
@@ -434,17 +434,17 @@ export const ClientDetailPage: React.FC = () => {
         <div>
           <Link
             to="/dashboard/clients"
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back to Clients</span>
           </Link>
         </div>
 
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-xs p-12 text-center max-w-lg mx-auto">
-          <AlertCircle className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
-          <h2 className="text-base font-bold text-neutral-900">Client not found</h2>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto mb-6">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs p-12 text-center max-w-lg mx-auto transition-colors">
+          <AlertCircle className="w-12 h-12 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">Client not found</h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto mb-6">
             The requested client document does not exist or may have been deleted.
           </p>
           <Link
@@ -466,7 +466,7 @@ export const ClientDetailPage: React.FC = () => {
       <div>
         <Link
           to="/dashboard/clients"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 hover:text-neutral-900 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           <span>Back to Clients</span>
@@ -474,43 +474,43 @@ export const ClientDetailPage: React.FC = () => {
       </div>
 
       {/* Top Client Summary Card */}
-      <div className="bg-white p-6 rounded-xl border border-neutral-200 shadow-xs">
+      <div className="bg-white dark:bg-neutral-800 p-6 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs transition-colors">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight text-neutral-900">
+              <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">
                 {client.name}
               </h1>
-              {/* Status Badge (exact styling from ClientsPage) */}
+              {/* Status Badge */}
               <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                   client.status === 'active'
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800'
+                    : 'bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-700/60 dark:text-neutral-400 dark:border-neutral-600'
                 }`}
               >
                 {client.status}
               </span>
             </div>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-600 pt-1">
+            <div className="flex flex-wrap items-center gap-4 text-xs text-neutral-600 dark:text-neutral-300 pt-1">
               <div className="flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-neutral-400" />
-                <span className="text-neutral-500">Group:</span>
+                <Building className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
+                <span className="text-neutral-500 dark:text-neutral-400">Group:</span>
                 {groupName !== '—' ? (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-neutral-100 text-neutral-800">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200">
                     {groupName}
                   </span>
                 ) : (
-                  <span className="text-neutral-400">—</span>
+                  <span className="text-neutral-400 dark:text-neutral-500">—</span>
                 )}
               </div>
 
               {client.contact_info && (
                 <div className="flex items-center gap-1.5">
-                  <Phone className="w-3.5 h-3.5 text-neutral-400" />
-                  <span className="text-neutral-500">Contact:</span>
-                  <span className="font-medium text-neutral-800">{client.contact_info}</span>
+                  <Phone className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500" />
+                  <span className="text-neutral-500 dark:text-neutral-400">Contact:</span>
+                  <span className="font-medium text-neutral-800 dark:text-neutral-200">{client.contact_info}</span>
                 </div>
               )}
             </div>
@@ -533,31 +533,31 @@ export const ClientDetailPage: React.FC = () => {
       {/* SOP Section Header */}
       <div className="flex items-center justify-between pt-2">
         <div>
-          <h2 className="text-base font-bold text-neutral-900 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-neutral-500" />
+          <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+            <FileText className="w-4 h-4 text-neutral-500 dark:text-neutral-400" />
             <span>Standard Operating Procedures (SOPs)</span>
           </h2>
-          <p className="text-xs text-neutral-500 mt-0.5">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
             Documented client processes and operating guidelines
           </p>
         </div>
-        <span className="text-xs font-medium text-neutral-500">
+        <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
           {sops.length} {sops.length === 1 ? 'procedure' : 'procedures'}
         </span>
       </div>
 
       {/* SOPs List */}
       {sopsLoading ? (
-        <div className="bg-white p-12 rounded-xl border border-neutral-200 text-center text-neutral-500 text-sm">
-          <div className="w-6 h-6 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin mx-auto mb-2" />
+        <div className="bg-white dark:bg-neutral-800 p-12 rounded-xl border border-neutral-200 dark:border-neutral-700 text-center text-neutral-500 dark:text-neutral-400 text-sm transition-colors">
+          <div className="w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-800 dark:border-t-neutral-100 rounded-full animate-spin mx-auto mb-2" />
           Loading SOPs...
         </div>
       ) : sops.length === 0 ? (
         /* Empty State */
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-xs p-12 text-center">
-          <FileText className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-          <p className="text-sm font-semibold text-neutral-800">No SOPs yet</p>
-          <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs p-12 text-center transition-colors">
+          <FileText className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+          <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">No SOPs yet</p>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
             {isPrivileged
               ? "No SOPs yet. Click 'Add SOP' to document a process for this client."
               : 'No SOPs yet'}
@@ -565,7 +565,7 @@ export const ClientDetailPage: React.FC = () => {
           {isPrivileged && (
             <button
               onClick={openAddModal}
-              className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-neutral-900 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors cursor-pointer"
+              className="mt-4 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-neutral-900 dark:text-neutral-100 bg-neutral-100 dark:bg-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-600 rounded-lg transition-colors cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add SOP</span>
@@ -580,19 +580,19 @@ export const ClientDetailPage: React.FC = () => {
             return (
               <div
                 key={sop.id}
-                className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden transition-all"
+                className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs overflow-hidden transition-colors"
               >
                 {/* Header / Clickable Accordion Bar */}
                 <div
                   onClick={() => toggleSopExpand(sop.id)}
-                  className="p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-50/75 select-none transition-colors"
+                  className="p-4 flex items-center justify-between gap-4 cursor-pointer hover:bg-neutral-50/75 dark:hover:bg-neutral-700/50 select-none transition-colors"
                 >
                   {/* Table-like row: 1. Step number badge, 2. Title */}
                   <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="w-6 h-6 rounded-md bg-neutral-900 text-white flex items-center justify-center text-xs font-bold shrink-0">
+                    <span className="w-6 h-6 rounded-md bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 flex items-center justify-center text-xs font-bold shrink-0">
                       {index + 1}
                     </span>
-                    <h3 className="text-sm font-semibold text-neutral-900 truncate">
+                    <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-100 truncate">
                       {sop.title}
                     </h3>
                   </div>
@@ -602,7 +602,7 @@ export const ClientDetailPage: React.FC = () => {
                     {/* Privileged Reorder & Edit & Delete Controls (tl and manager only) */}
                     {isPrivileged && (
                       <div
-                        className="flex items-center gap-0.5 pr-1 border-r border-neutral-200"
+                        className="flex items-center gap-0.5 pr-1 border-r border-neutral-200 dark:border-neutral-700"
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
@@ -610,7 +610,7 @@ export const ClientDetailPage: React.FC = () => {
                           disabled={index === 0 || isReordering}
                           onClick={(e) => handleMoveUp(index, e)}
                           title="Move step up"
-                          className="p-1.5 text-neutral-500 hover:text-neutral-900 rounded-md hover:bg-neutral-100 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                          className="p-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                         >
                           <ArrowUp className="w-4 h-4" />
                         </button>
@@ -619,7 +619,7 @@ export const ClientDetailPage: React.FC = () => {
                           disabled={index === sops.length - 1 || isReordering}
                           onClick={(e) => handleMoveDown(index, e)}
                           title="Move step down"
-                          className="p-1.5 text-neutral-500 hover:text-neutral-900 rounded-md hover:bg-neutral-100 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                          className="p-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                         >
                           <ArrowDown className="w-4 h-4" />
                         </button>
@@ -627,7 +627,7 @@ export const ClientDetailPage: React.FC = () => {
                           type="button"
                           onClick={(e) => openEditModal(sop, e)}
                           title="Edit SOP"
-                          className="p-1.5 text-neutral-400 hover:text-neutral-700 rounded-md hover:bg-neutral-100 transition-colors cursor-pointer"
+                          className="p-1.5 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 rounded-md hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -635,7 +635,7 @@ export const ClientDetailPage: React.FC = () => {
                           type="button"
                           onClick={(e) => openDeleteDialog(sop, e)}
                           title="Delete SOP"
-                          className="p-1.5 text-neutral-400 hover:text-red-600 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+                          className="p-1.5 text-neutral-400 hover:text-red-600 dark:hover:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -643,7 +643,7 @@ export const ClientDetailPage: React.FC = () => {
                     )}
 
                     {/* Expand/Collapse Chevron */}
-                    <div className="p-1 text-neutral-400">
+                    <div className="p-1 text-neutral-400 dark:text-neutral-500">
                       {isExpanded ? (
                         <ChevronUp className="w-4 h-4" />
                       ) : (
@@ -655,14 +655,14 @@ export const ClientDetailPage: React.FC = () => {
 
                 {/* Expanded Content */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 pt-1 border-t border-neutral-100 bg-neutral-50/40">
+                  <div className="px-4 pb-4 pt-1 border-t border-neutral-100 dark:border-neutral-700 bg-neutral-50/40 dark:bg-neutral-850/40 transition-colors">
                     {/* Multiline content with white-space: pre-wrap */}
-                    <div className="py-3 text-sm text-neutral-800 whitespace-pre-wrap leading-relaxed">
+                    <div className="py-3 text-sm text-neutral-800 dark:text-neutral-200 whitespace-pre-wrap leading-relaxed">
                       {sop.content}
                     </div>
 
                     {/* Footer: readable date */}
-                    <div className="pt-3 border-t border-neutral-200/60 flex items-center gap-1.5 text-xs text-neutral-400">
+                    <div className="pt-3 border-t border-neutral-200/60 dark:border-neutral-700/60 flex items-center gap-1.5 text-xs text-neutral-400 dark:text-neutral-500">
                       <Clock className="w-3.5 h-3.5" />
                       <span>Last updated: {formatTimestamp(sop.last_updated_at)}</span>
                     </div>
@@ -676,24 +676,24 @@ export const ClientDetailPage: React.FC = () => {
 
       {/* Add / Edit SOP Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full border border-neutral-200 p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 mb-4">
-              <h3 className="text-lg font-bold text-neutral-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full border border-neutral-200 dark:border-neutral-700 p-6 transition-colors">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-700 mb-4">
+              <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
                 {editingSop ? 'Edit SOP' : 'Add SOP'}
               </h3>
               <button
                 type="button"
                 onClick={closeModal}
-                className="p-1 text-neutral-400 hover:text-neutral-600 rounded-md transition-colors cursor-pointer"
+                className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {modalError && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-xs text-red-700 mb-4">
-                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2 text-xs text-red-700 dark:text-red-300 mb-4">
+                <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
                 <span>{modalError}</span>
               </div>
             )}
@@ -702,7 +702,7 @@ export const ClientDetailPage: React.FC = () => {
               <div>
                 <label
                   htmlFor="sop-title-input"
-                  className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+                  className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1"
                 >
                   Title *
                 </label>
@@ -713,14 +713,14 @@ export const ClientDetailPage: React.FC = () => {
                   value={formTitle}
                   onChange={(e) => setFormTitle(e.target.value)}
                   placeholder="e.g. Monthly Reporting Workflow"
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
               <div>
                 <label
                   htmlFor="sop-content-input"
-                  className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1"
+                  className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1"
                 >
                   Content *
                 </label>
@@ -731,7 +731,7 @@ export const ClientDetailPage: React.FC = () => {
                   value={formContent}
                   onChange={(e) => setFormContent(e.target.value)}
                   placeholder="Write the SOP guidelines and process steps here..."
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue leading-relaxed font-sans"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400 leading-relaxed font-sans"
                 />
               </div>
 
@@ -740,7 +740,7 @@ export const ClientDetailPage: React.FC = () => {
                   type="button"
                   onClick={closeModal}
                   disabled={submitting}
-                  className="px-4 py-2 text-sm font-medium text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors cursor-pointer"
+                  className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-600 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>

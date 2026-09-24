@@ -229,8 +229,8 @@ export const ClientsPage: React.FC = () => {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-neutral-900">Clients</h1>
-          <p className="text-sm text-neutral-500 mt-0.5">
+          <h1 className="text-2xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100">Clients</h1>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-0.5">
             Manage organization clients and their group associations
           </p>
         </div>
@@ -249,17 +249,17 @@ export const ClientsPage: React.FC = () => {
       </div>
 
       {/* Filter and Control Bar */}
-      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white dark:bg-neutral-800 p-4 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 text-sm text-neutral-600 font-medium">
-            <Filter className="w-4 h-4 text-neutral-400" />
+          <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-300 font-medium">
+            <Filter className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
             <span>Group:</span>
           </div>
           <select
             id="client-group-filter"
             value={selectedGroupFilter}
             onChange={(e) => setSelectedGroupFilter(e.target.value)}
-            className="px-3 py-1.5 text-sm bg-neutral-50 border border-neutral-300 rounded-lg text-neutral-800 focus:outline-none focus:ring-2 focus:ring-brand-blue"
+            className="px-3 py-1.5 text-sm bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-blue"
           >
             <option value="all">All Groups</option>
             <option value="unassigned">Unassigned (No Group)</option>
@@ -278,8 +278,8 @@ export const ClientsPage: React.FC = () => {
             onClick={() => setShowInactive(!showInactive)}
             className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors cursor-pointer ${
               showInactive
-                ? 'bg-neutral-900 text-white border-neutral-900'
-                : 'bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50'
+                ? 'bg-neutral-900 dark:bg-neutral-100 text-white dark:text-neutral-900 border-neutral-900 dark:border-neutral-100'
+                : 'bg-white dark:bg-neutral-700 text-neutral-700 dark:text-neutral-200 border-neutral-300 dark:border-neutral-600 hover:bg-neutral-50 dark:hover:bg-neutral-600'
             }`}
           >
             {showInactive ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
@@ -289,17 +289,17 @@ export const ClientsPage: React.FC = () => {
       </div>
 
       {/* Table Section */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs overflow-hidden transition-colors">
         {loading ? (
-          <div className="p-12 text-center text-neutral-500 text-sm">
-            <div className="w-6 h-6 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin mx-auto mb-2" />
+          <div className="p-12 text-center text-neutral-500 dark:text-neutral-400 text-sm">
+            <div className="w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-800 dark:border-t-neutral-100 rounded-full animate-spin mx-auto mb-2" />
             Loading clients...
           </div>
         ) : filteredClients.length === 0 ? (
           <div className="p-12 text-center">
-            <Building className="w-10 h-10 text-neutral-300 mx-auto mb-3" />
-            <p className="text-sm font-semibold text-neutral-800">No clients found</p>
-            <p className="text-xs text-neutral-500 mt-1 max-w-sm mx-auto">
+            <Building className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+            <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">No clients found</p>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
               {clients.length === 0
                 ? isPrivileged
                   ? 'No clients have been created yet. Click "Add Client" to get started.'
@@ -311,7 +311,7 @@ export const ClientsPage: React.FC = () => {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="border-b border-neutral-200 bg-neutral-50/75 text-xs font-semibold uppercase tracking-wider text-neutral-600">
+                <tr className="border-b border-neutral-200 dark:border-neutral-700 bg-neutral-50/75 dark:bg-neutral-800/60 text-xs font-semibold uppercase tracking-wider text-neutral-600 dark:text-neutral-400">
                   <th className="py-3 px-4">Name</th>
                   <th className="py-3 px-4">Group</th>
                   <th className="py-3 px-4">Status</th>
@@ -319,47 +319,47 @@ export const ClientsPage: React.FC = () => {
                   {isPrivileged && <th className="py-3 px-4 text-right">Actions</th>}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-200 text-sm">
+              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700 text-sm">
                 {filteredClients.map((client) => {
                   const groupName = client.group_id
                     ? groupMap.get(client.group_id) || 'Unknown Group'
                     : '—';
 
                   return (
-                    <tr key={client.id} className="hover:bg-neutral-50/80 transition-colors">
-                      <td className="py-3.5 px-4 font-medium text-neutral-900">
+                    <tr key={client.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-700/50 transition-colors">
+                      <td className="py-3.5 px-4 font-medium text-neutral-900 dark:text-neutral-100">
                         <Link
                           to={`/dashboard/clients/${client.id}`}
-                          className="text-neutral-900 hover:text-blue-600 hover:underline transition-colors font-medium"
+                          className="text-neutral-900 dark:text-neutral-100 hover:text-blue-600 dark:hover:text-blue-400 hover:underline transition-colors font-medium"
                         >
                           {client.name}
                         </Link>
                       </td>
-                      <td className="py-3.5 px-4 text-neutral-600">
+                      <td className="py-3.5 px-4 text-neutral-600 dark:text-neutral-300">
                         {groupName !== '—' ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-neutral-100 text-neutral-800">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-neutral-100 dark:bg-neutral-700 text-neutral-800 dark:text-neutral-200">
                             {groupName}
                           </span>
                         ) : (
-                          <span className="text-neutral-400 text-xs">—</span>
+                          <span className="text-neutral-400 dark:text-neutral-500 text-xs">—</span>
                         )}
                       </td>
                       <td className="py-3.5 px-4">
                         <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
                             client.status === 'active'
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : 'bg-neutral-100 text-neutral-500 border border-neutral-200'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:border-emerald-800'
+                              : 'bg-neutral-100 text-neutral-500 border-neutral-200 dark:bg-neutral-700/60 dark:text-neutral-400 dark:border-neutral-600'
                           }`}
                         >
                           {client.status}
                         </span>
                       </td>
-                      <td className="py-3.5 px-4 text-neutral-600 max-w-xs truncate">
+                      <td className="py-3.5 px-4 text-neutral-600 dark:text-neutral-300 max-w-xs truncate">
                         {client.contact_info ? (
-                          <span className="text-xs text-neutral-700">{client.contact_info}</span>
+                          <span className="text-xs text-neutral-700 dark:text-neutral-300">{client.contact_info}</span>
                         ) : (
-                          <span className="text-neutral-400 text-xs">—</span>
+                          <span className="text-neutral-400 dark:text-neutral-500 text-xs">—</span>
                         )}
                       </td>
 
@@ -371,7 +371,7 @@ export const ClientsPage: React.FC = () => {
                               id={`edit-client-${client.id}`}
                               type="button"
                               onClick={() => openEditModal(client)}
-                              className="p-1.5 text-neutral-500 hover:text-neutral-900 hover:bg-neutral-100 rounded-md transition-colors"
+                              className="p-1.5 text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 hover:bg-neutral-100 dark:hover:bg-neutral-700 rounded-md transition-colors cursor-pointer"
                               title="Edit Client"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
@@ -380,7 +380,7 @@ export const ClientsPage: React.FC = () => {
                               id={`delete-client-${client.id}`}
                               type="button"
                               onClick={() => setDeleteTarget(client)}
-                              className="p-1.5 text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                              className="p-1.5 text-neutral-500 dark:text-neutral-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-md transition-colors cursor-pointer"
                               title="Delete Client"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -399,30 +399,30 @@ export const ClientsPage: React.FC = () => {
 
       {/* Add / Edit Client Modal (tl / manager only) */}
       {isModalOpen && isPrivileged && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full border border-neutral-200 p-6">
-            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 mb-4">
-              <h2 className="text-lg font-bold text-neutral-900">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-md w-full border border-neutral-200 dark:border-neutral-700 p-6 transition-colors">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-700 mb-4">
+              <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">
                 {editingClient ? 'Edit Client' : 'Add Client'}
               </h2>
               <button
                 type="button"
                 onClick={closeModal}
-                className="p-1 text-neutral-400 hover:text-neutral-600 rounded-md transition-colors"
+                className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {formError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300">
                 {formError}
               </div>
             )}
 
             <form onSubmit={handleSaveClient} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Name *
                 </label>
                 <input
@@ -432,19 +432,19 @@ export const ClientsPage: React.FC = () => {
                   value={formName}
                   onChange={(e) => setFormName(e.target.value)}
                   placeholder="Acme Corporation"
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Group
                 </label>
                 <select
                   id="client-group-input"
                   value={formGroupId}
                   onChange={(e) => setFormGroupId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 >
                   <option value="">None (Unassigned)</option>
                   {groups.map((g) => (
@@ -456,14 +456,14 @@ export const ClientsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Status
                 </label>
                 <select
                   id="client-status-input"
                   value={formStatus}
                   onChange={(e) => setFormStatus(e.target.value as 'active' | 'inactive')}
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                 >
                   <option value="active">active</option>
                   <option value="inactive">inactive</option>
@@ -471,7 +471,7 @@ export const ClientsPage: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
+                <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1">
                   Contact Info (Optional)
                 </label>
                 <textarea
@@ -480,7 +480,7 @@ export const ClientsPage: React.FC = () => {
                   value={formContactInfo}
                   onChange={(e) => setFormContactInfo(e.target.value)}
                   placeholder="Email, phone, primary contact person..."
-                  className="w-full px-3 py-2 text-sm border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue"
+                  className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-400"
                 />
               </div>
 
@@ -489,7 +489,7 @@ export const ClientsPage: React.FC = () => {
                   type="button"
                   onClick={closeModal}
                   disabled={formSubmitting}
-                  className="px-4 py-2 text-sm font-medium text-neutral-700 bg-white border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+                  className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-600 transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>

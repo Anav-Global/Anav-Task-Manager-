@@ -553,11 +553,11 @@ export const ReportsPage: React.FC = () => {
       {/* Header and Filter Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-neutral-900 flex items-center gap-2">
+          <h1 className="text-xl font-bold tracking-tight text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
             <BarChart3 className="w-6 h-6 text-brand-purple" />
             <span>Task Completion Reports</span>
           </h1>
-          <p className="text-xs text-neutral-500 mt-1">
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
             Performance metrics and compliance tracking by employee for tasks due in the selected period.
           </p>
         </div>
@@ -569,25 +569,25 @@ export const ReportsPage: React.FC = () => {
             <button
               type="button"
               onClick={handleExportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50 shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-2xs transition-colors cursor-pointer"
               title="Download Excel workbook with Summary and Task Detail sheets"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+              <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>Export to Excel</span>
             </button>
             <button
               type="button"
               onClick={handleExportPDF}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50 shadow-2xs transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-white dark:bg-neutral-800 border border-neutral-300 dark:border-neutral-700 text-neutral-700 dark:text-neutral-200 hover:bg-neutral-50 dark:hover:bg-neutral-700 shadow-2xs transition-colors cursor-pointer"
               title="Download PDF report with Summary and Task Detail tables"
             >
-              <FileText className="w-4 h-4 text-red-600" />
+              <FileText className="w-4 h-4 text-red-600 dark:text-red-400" />
               <span>Export to PDF</span>
             </button>
           </div>
 
           {/* Date Filter & Presets */}
-          <div className="flex flex-wrap items-center gap-2 bg-white p-1.5 rounded-xl border border-neutral-200 shadow-2xs">
+          <div className="flex flex-wrap items-center gap-2 bg-white dark:bg-neutral-800 p-1.5 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs transition-colors">
             <div className="flex items-center gap-1">
               <button
                 type="button"
@@ -595,7 +595,7 @@ export const ReportsPage: React.FC = () => {
                 className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                   preset === 'this_month'
                     ? 'bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-2xs'
-                    : 'text-neutral-600 hover:bg-neutral-100'
+                    : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
                 }`}
               >
                 This Month
@@ -606,7 +606,7 @@ export const ReportsPage: React.FC = () => {
                 className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                   preset === 'last_month'
                     ? 'bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-2xs'
-                    : 'text-neutral-600 hover:bg-neutral-100'
+                    : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
                 }`}
               >
                 Last Month
@@ -617,18 +617,18 @@ export const ReportsPage: React.FC = () => {
                 className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${
                   preset === 'last_30_days'
                     ? 'bg-gradient-to-r from-brand-purple to-brand-blue text-white shadow-2xs'
-                    : 'text-neutral-600 hover:bg-neutral-100'
+                    : 'text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-700'
                 }`}
               >
                 Last 30 Days
               </button>
             </div>
 
-            <div className="h-4 w-px bg-neutral-200 hidden sm:block" />
+            <div className="h-4 w-px bg-neutral-200 dark:bg-neutral-700 hidden sm:block" />
 
             {/* Date Range Inputs */}
-            <div className="flex items-center gap-1.5 text-xs text-neutral-600">
-              <Calendar className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+            <div className="flex items-center gap-1.5 text-xs text-neutral-600 dark:text-neutral-300">
+              <Calendar className="w-3.5 h-3.5 text-neutral-400 dark:text-neutral-500 shrink-0" />
               <input
                 type="date"
                 value={startDate}
@@ -636,9 +636,9 @@ export const ReportsPage: React.FC = () => {
                   setStartDate(e.target.value);
                   setPreset('custom');
                 }}
-                className="px-2 py-1 text-xs border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-blue bg-white"
+                className="px-2 py-1 text-xs border border-neutral-300 dark:border-neutral-600 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
               />
-              <span className="text-neutral-400">to</span>
+              <span className="text-neutral-400 dark:text-neutral-500">to</span>
               <input
                 type="date"
                 value={endDate}
@@ -646,7 +646,7 @@ export const ReportsPage: React.FC = () => {
                   setEndDate(e.target.value);
                   setPreset('custom');
                 }}
-                className="px-2 py-1 text-xs border border-neutral-300 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-blue bg-white"
+                className="px-2 py-1 text-xs border border-neutral-300 dark:border-neutral-600 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
               />
             </div>
           </div>
@@ -655,64 +655,64 @@ export const ReportsPage: React.FC = () => {
 
       {/* Overview Stat Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-2xs">
-          <div className="text-xs font-medium text-neutral-500">Total Tasks</div>
-          <div className="text-xl font-bold text-neutral-900 mt-1">{overallTotals.total}</div>
+        <div className="bg-white dark:bg-neutral-800 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs transition-colors">
+          <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400">Total Tasks</div>
+          <div className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{overallTotals.total}</div>
         </div>
-        <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-2xs">
-          <div className="text-xs font-medium text-emerald-700 flex items-center gap-1">
+        <div className="bg-white dark:bg-neutral-800 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs transition-colors">
+          <div className="text-xs font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
             <CheckCircle2 className="w-3.5 h-3.5" />
             <span>On-Time</span>
           </div>
-          <div className="text-xl font-bold text-emerald-700 mt-1">{overallTotals.onTime}</div>
+          <div className="text-xl font-bold text-emerald-700 dark:text-emerald-400 mt-1">{overallTotals.onTime}</div>
         </div>
-        <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-2xs">
-          <div className="text-xs font-medium text-amber-700 flex items-center gap-1">
+        <div className="bg-white dark:bg-neutral-800 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs transition-colors">
+          <div className="text-xs font-medium text-amber-700 dark:text-amber-400 flex items-center gap-1">
             <Clock className="w-3.5 h-3.5" />
             <span>Late</span>
           </div>
-          <div className="text-xl font-bold text-amber-700 mt-1">{overallTotals.late}</div>
+          <div className="text-xl font-bold text-amber-700 dark:text-amber-400 mt-1">{overallTotals.late}</div>
         </div>
-        <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-2xs">
-          <div className="text-xs font-medium text-red-700 flex items-center gap-1">
+        <div className="bg-white dark:bg-neutral-800 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs transition-colors">
+          <div className="text-xs font-medium text-red-700 dark:text-red-400 flex items-center gap-1">
             <AlertCircle className="w-3.5 h-3.5" />
             <span>Missed</span>
           </div>
-          <div className="text-xl font-bold text-red-700 mt-1">{overallTotals.missed}</div>
+          <div className="text-xl font-bold text-red-700 dark:text-red-400 mt-1">{overallTotals.missed}</div>
         </div>
-        <div className="bg-white p-3.5 rounded-xl border border-neutral-200 shadow-2xs col-span-2 sm:col-span-1">
-          <div className="text-xs font-medium text-neutral-500">On-Time Rate</div>
-          <div className="text-xl font-bold text-neutral-900 mt-1">{overallTotals.rate}</div>
+        <div className="bg-white dark:bg-neutral-800 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs col-span-2 sm:col-span-1 transition-colors">
+          <div className="text-xs font-medium text-neutral-500 dark:text-neutral-400">On-Time Rate</div>
+          <div className="text-xl font-bold text-neutral-900 dark:text-neutral-100 mt-1">{overallTotals.rate}</div>
         </div>
       </div>
 
       {/* Summary Table with Expandable Drill-Down */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-2xs overflow-hidden">
+      <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-2xs overflow-hidden transition-colors">
         {loading ? (
-          <div className="p-12 text-center text-neutral-500 text-sm">
-            <div className="w-6 h-6 border-2 border-neutral-300 border-t-neutral-800 rounded-full animate-spin mx-auto mb-2" />
+          <div className="p-12 text-center text-neutral-500 dark:text-neutral-400 text-sm">
+            <div className="w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-800 dark:border-t-neutral-100 rounded-full animate-spin mx-auto mb-2" />
             <span>Loading performance reports...</span>
           </div>
         ) : employeeReports.length === 0 ? (
-          <div className="p-12 text-center text-neutral-500 text-sm">
-            <Users className="w-8 h-8 text-neutral-300 mx-auto mb-2" />
+          <div className="p-12 text-center text-neutral-500 dark:text-neutral-400 text-sm">
+            <Users className="w-8 h-8 text-neutral-300 dark:text-neutral-600 mx-auto mb-2" />
             <span>No employee records found.</span>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-neutral-50 border-b border-neutral-200 text-xs font-semibold text-neutral-600">
+                <tr className="bg-neutral-50/75 dark:bg-neutral-800/60 border-b border-neutral-200 dark:border-neutral-700 text-xs font-semibold text-neutral-600 dark:text-neutral-400">
                   <th className="py-3 px-4 w-8"></th>
                   <th className="py-3 px-4">Employee</th>
                   <th className="py-3 px-4 text-center">Total</th>
-                  <th className="py-3 px-4 text-center text-emerald-700">On-Time</th>
-                  <th className="py-3 px-4 text-center text-amber-700">Late</th>
-                  <th className="py-3 px-4 text-center text-red-700">Missed</th>
+                  <th className="py-3 px-4 text-center text-emerald-700 dark:text-emerald-400">On-Time</th>
+                  <th className="py-3 px-4 text-center text-amber-700 dark:text-amber-400">Late</th>
+                  <th className="py-3 px-4 text-center text-red-700 dark:text-red-400">Missed</th>
                   <th className="py-3 px-4 text-right">On-Time Rate</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-200 text-sm">
+              <tbody className="divide-y divide-neutral-200 dark:divide-neutral-700 text-sm">
                 {employeeReports.map((report) => {
                   const emp = report.user;
                   const isExpanded = !!expandedRows[emp.id];
@@ -722,74 +722,74 @@ export const ReportsPage: React.FC = () => {
                       {/* Summary Row */}
                       <tr
                         onClick={() => toggleRow(emp.id)}
-                        className="hover:bg-neutral-50/80 transition-colors cursor-pointer select-none"
+                        className="hover:bg-neutral-50/80 dark:hover:bg-neutral-700/50 transition-colors cursor-pointer select-none"
                       >
-                        <td className="py-3 px-4 text-neutral-400">
+                        <td className="py-3 px-4 text-neutral-400 dark:text-neutral-500">
                           {isExpanded ? (
-                            <ChevronUp className="w-4 h-4 text-neutral-600" />
+                            <ChevronUp className="w-4 h-4 text-neutral-600 dark:text-neutral-300" />
                           ) : (
-                            <ChevronDown className="w-4 h-4 text-neutral-400" />
+                            <ChevronDown className="w-4 h-4 text-neutral-400 dark:text-neutral-500" />
                           )}
                         </td>
-                        <td className="py-3 px-4 font-medium text-neutral-900">
+                        <td className="py-3 px-4 font-medium text-neutral-900 dark:text-neutral-100">
                           <div className="flex items-center gap-2">
                             <span>{emp.name || 'Unnamed Employee'}</span>
-                            <span className="text-xs text-neutral-400 font-normal">({emp.email})</span>
+                            <span className="text-xs text-neutral-400 dark:text-neutral-500 font-normal">({emp.email})</span>
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-center font-medium text-neutral-700">
+                        <td className="py-3 px-4 text-center font-medium text-neutral-700 dark:text-neutral-300">
                           {report.total}
                         </td>
-                        <td className="py-3 px-4 text-center font-semibold text-emerald-700">
+                        <td className="py-3 px-4 text-center font-semibold text-emerald-700 dark:text-emerald-400">
                           {report.onTimeCount}
                         </td>
-                        <td className="py-3 px-4 text-center font-semibold text-amber-700">
+                        <td className="py-3 px-4 text-center font-semibold text-amber-700 dark:text-amber-400">
                           {report.lateCount}
                         </td>
-                        <td className="py-3 px-4 text-center font-semibold text-red-700">
+                        <td className="py-3 px-4 text-center font-semibold text-red-700 dark:text-red-400">
                           {report.missedCount}
                         </td>
-                        <td className="py-3 px-4 text-right font-bold text-neutral-900">
+                        <td className="py-3 px-4 text-right font-bold text-neutral-900 dark:text-neutral-100">
                           {report.onTimeRate}
                         </td>
                       </tr>
 
                       {/* Expandable Drill-Down Row */}
                       {isExpanded && (
-                        <tr className="bg-neutral-50/60 border-b border-neutral-200">
+                        <tr className="bg-neutral-50/60 dark:bg-neutral-850/60 border-b border-neutral-200 dark:border-neutral-700">
                           <td colSpan={7} className="px-6 py-5">
                             <div className="space-y-6 max-w-4xl">
                               {/* 1. On-Time Sub-Section */}
                               <div>
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                                  <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                                  <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
                                     On-Time ({report.onTimeTasks.length})
                                   </h4>
                                 </div>
                                 {report.onTimeTasks.length === 0 ? (
-                                  <p className="text-xs text-neutral-400 italic pl-4">None</p>
+                                  <p className="text-xs text-neutral-400 dark:text-neutral-500 italic pl-4">None</p>
                                 ) : (
                                   <div className="space-y-2 pl-4">
                                     {report.onTimeTasks.map((task) => (
                                       <div
                                         key={task.id}
-                                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white rounded-lg border border-neutral-200 shadow-2xs text-xs"
+                                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-2xs text-xs transition-colors"
                                       >
                                         <div className="min-w-0 flex-1">
-                                          <span className="font-semibold text-neutral-900 block truncate">
+                                          <span className="font-semibold text-neutral-900 dark:text-neutral-100 block truncate">
                                             {task.title}
                                           </span>
-                                          <span className="text-neutral-500">
+                                          <span className="text-neutral-500 dark:text-neutral-400">
                                             Client:{' '}
-                                            <span className="text-neutral-700 font-medium">
+                                            <span className="text-neutral-700 dark:text-neutral-200 font-medium">
                                               {clientMap[task.client_id] || 'Unknown Client'}
                                             </span>
                                           </span>
                                         </div>
-                                        <div className="flex flex-wrap items-center gap-3 text-neutral-500 shrink-0">
+                                        <div className="flex flex-wrap items-center gap-3 text-neutral-500 dark:text-neutral-400 shrink-0">
                                           <span>Due: {formatDisplayDate(task.due_date)}</span>
-                                          <span className="inline-flex items-center gap-1 text-emerald-700 font-medium bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                          <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
                                             Completed: {formatDisplayDate(task.completed_at)}
                                           </span>
                                         </div>
@@ -803,12 +803,12 @@ export const ReportsPage: React.FC = () => {
                               <div>
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0" />
-                                  <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                                  <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
                                     Late ({report.lateTasks.length})
                                   </h4>
                                 </div>
                                 {report.lateTasks.length === 0 ? (
-                                  <p className="text-xs text-neutral-400 italic pl-4">None</p>
+                                  <p className="text-xs text-neutral-400 dark:text-neutral-500 italic pl-4">None</p>
                                 ) : (
                                   <div className="space-y-2 pl-4">
                                     {report.lateTasks.map((task) => {
@@ -816,23 +816,23 @@ export const ReportsPage: React.FC = () => {
                                       return (
                                         <div
                                           key={task.id}
-                                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white rounded-lg border border-neutral-200 shadow-2xs text-xs"
+                                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-2xs text-xs transition-colors"
                                         >
                                           <div className="min-w-0 flex-1">
-                                            <span className="font-semibold text-neutral-900 block truncate">
+                                            <span className="font-semibold text-neutral-900 dark:text-neutral-100 block truncate">
                                               {task.title}
                                             </span>
-                                            <span className="text-neutral-500">
+                                            <span className="text-neutral-500 dark:text-neutral-400">
                                               Client:{' '}
-                                              <span className="text-neutral-700 font-medium">
+                                              <span className="text-neutral-700 dark:text-neutral-200 font-medium">
                                                 {clientMap[task.client_id] || 'Unknown Client'}
                                               </span>
                                             </span>
                                           </div>
-                                          <div className="flex flex-wrap items-center gap-3 text-neutral-500 shrink-0">
+                                          <div className="flex flex-wrap items-center gap-3 text-neutral-500 dark:text-neutral-400 shrink-0">
                                             <span>Due: {formatDisplayDate(task.due_date)}</span>
                                             <span>Completed: {formatDisplayDate(task.completed_at)}</span>
-                                            <span className="inline-flex items-center text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                            <span className="inline-flex items-center text-amber-700 dark:text-amber-300 font-semibold bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
                                               {daysLate} {daysLate === 1 ? 'day' : 'days'} late
                                             </span>
                                           </div>
@@ -847,12 +847,12 @@ export const ReportsPage: React.FC = () => {
                               <div>
                                 <div className="flex items-center gap-2 mb-2">
                                   <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
-                                  <h4 className="text-xs font-bold text-neutral-800 uppercase tracking-wider">
+                                  <h4 className="text-xs font-bold text-neutral-800 dark:text-neutral-200 uppercase tracking-wider">
                                     Missed ({report.missedTasks.length})
                                   </h4>
                                 </div>
                                 {report.missedTasks.length === 0 ? (
-                                  <p className="text-xs text-neutral-400 italic pl-4">None</p>
+                                  <p className="text-xs text-neutral-400 dark:text-neutral-500 italic pl-4">None</p>
                                 ) : (
                                   <div className="space-y-2 pl-4">
                                     {report.missedTasks.map((task) => {
@@ -860,22 +860,22 @@ export const ReportsPage: React.FC = () => {
                                       return (
                                         <div
                                           key={task.id}
-                                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white rounded-lg border border-neutral-200 shadow-2xs text-xs"
+                                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 bg-white dark:bg-neutral-800 rounded-lg border border-neutral-200 dark:border-neutral-700 shadow-2xs text-xs transition-colors"
                                         >
                                           <div className="min-w-0 flex-1">
-                                            <span className="font-semibold text-neutral-900 block truncate">
+                                            <span className="font-semibold text-neutral-900 dark:text-neutral-100 block truncate">
                                               {task.title}
                                             </span>
-                                            <span className="text-neutral-500">
+                                            <span className="text-neutral-500 dark:text-neutral-400">
                                               Client:{' '}
-                                              <span className="text-neutral-700 font-medium">
+                                              <span className="text-neutral-700 dark:text-neutral-200 font-medium">
                                                 {clientMap[task.client_id] || 'Unknown Client'}
                                               </span>
                                             </span>
                                           </div>
-                                          <div className="flex flex-wrap items-center gap-3 text-neutral-500 shrink-0">
+                                          <div className="flex flex-wrap items-center gap-3 text-neutral-500 dark:text-neutral-400 shrink-0">
                                             <span>Due: {formatDisplayDate(task.due_date)}</span>
-                                            <span className="inline-flex items-center text-red-700 font-semibold bg-red-50 px-2 py-0.5 rounded border border-red-200">
+                                            <span className="inline-flex items-center text-red-700 dark:text-red-300 font-semibold bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200 dark:border-red-800">
                                               {daysOverdue} {daysOverdue === 1 ? 'day' : 'days'} overdue
                                             </span>
                                           </div>
