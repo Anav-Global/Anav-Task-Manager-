@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@config "../tailwind.config.js";
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
   --color-brand-purple: #6D28D9;

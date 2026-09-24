@@ -41,7 +41,13 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const handleChange = (e: MediaQueryListEvent) => {
       const saved = localStorage.getItem('theme');
       if (!saved) {
-        setThemeState(e.matches ? 'dark' : 'light');
+        const newTheme = e.matches ? 'dark' : 'light';
+        setThemeState(newTheme);
+        if (newTheme === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
       }
     };
 
@@ -50,11 +56,20 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const toggleTheme = () => {
-    setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
+    const isDark = document.documentElement.classList.toggle('dark');
+    const newTheme: Theme = isDark ? 'dark' : 'light';
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
   const setTheme = (newTheme: Theme) => {
+    if (newTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
   };
 
   return (
