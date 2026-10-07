@@ -38,6 +38,8 @@ import {
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useClientAccess } from '../utils/clientAccess';
+import { isAssignee } from '../utils/assignees';
 import type {
   Task,
   TaskTemplate,
@@ -90,6 +92,7 @@ export const TasksPage: React.FC = () => {
   const { user, userDoc } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
   const isManager = userDoc?.role === 'manager';
+  const { hasAllClients, canSeeClient, filterVisibleClients } = useClientAccess();
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -189,6 +192,10 @@ export const TasksPage: React.FC = () => {
 
   // Delete Task Instance Confirmation Dialog (tl/manager)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
+  // Mark Complete feedback (so a failed write is never silent)
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [completeErrors, setCompleteErrors] = useState<Record<string, string>>({});
   const [isDeletingTask, setIsDeletingTask] = useState(false);
 
   const deleteDialogTitle = useMemo(() => {
@@ -499,8 +506,47 @@ export const TasksPage: React.FC = () => {
     users.forEach((u) => {
       map[u.id] = u;
     });
+    // Employees aren't allowed to list other users (security rules), so make sure they at least
+    // resolve their own name instead of seeing "Unassigned (You)".
+    if (userDoc && !map[userDoc.id]) {
+      map[userDoc.id] = userDoc;
+    }
     return map;
-  }, [users]);
+  }, [users, userDoc]);
+
+  // Clients offered in the task modals: only ones this user may see, A-Z (case-insensitive)
+  const clientOptions = useMemo(
+    () =>
+      [...filterVisibleClients(clients)].sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      ),
+    [clients, filterVisibleClients]
+  );
+
+  // Group filter options: a scoped user only sees groups relevant to their clients / their own tasks
+  const groupFilterOptions = useMemo(() => {
+    if (hasAllClients) return groups;
+    const ids = new Set<string>();
+    clients.forEach((c) => {
+      if (c.group_id && canSeeClient(c.id)) ids.add(c.group_id);
+    });
+    tasks.forEach((t) => {
+      if (isAssignee(t, user?.uid)) {
+        const gid = clientsMap[t.client_id]?.group_id;
+        if (gid) ids.add(gid);
+      }
+    });
+    return groups.filter((g) => ids.has(g.id));
+  }, [hasAllClients, groups, clients, tasks, canSeeClient, clientsMap, user?.uid]);
+
+  // "Unassigned" (no group) only matters to a scoped user if one of their clients / their own tasks has no group
+  const showUnassignedGroupOption = useMemo(() => {
+    if (hasAllClients) return true;
+    return (
+      clients.some((c) => !c.group_id && canSeeClient(c.id)) ||
+      tasks.some((t) => isAssignee(t, user?.uid) && !clientsMap[t.client_id]?.group_id)
+    );
+  }, [hasAllClients, clients, tasks, canSeeClient, clientsMap, user?.uid]);
 
   // Comments mapped by task_id, sorted by timestamp ascending
   const commentsByTaskId = useMemo(() => {
@@ -539,11 +585,18 @@ export const TasksPage: React.FC = () => {
   const filteredTasks = useMemo(() => {
     const unskippedTasks = tasks.filter((t) => t.status !== 'skipped');
 
+    // 0. Client visibility: a task is visible if it is assigned to me (always — otherwise I could
+    // never complete it) OR its client is one I'm allowed to see. Everything below (lists, counters,
+    // group filter, template cards) builds on this set.
+    const visibleTasks = unskippedTasks.filter(
+      (t) => isAssignee(t, user?.uid) || canSeeClient(t.client_id)
+    );
+
     // 1. View filter ('my' vs 'all')
     const viewFiltered =
       viewFilter === 'my'
-        ? unskippedTasks.filter((t) => t.assigned_to === user?.uid)
-        : unskippedTasks;
+        ? visibleTasks.filter((t) => isAssignee(t, user?.uid))
+        : visibleTasks;
 
     // 2. Group filter ('all', 'unassigned', or specific groupId)
     if (selectedGroupFilter === 'all') {
@@ -559,7 +612,7 @@ export const TasksPage: React.FC = () => {
       }
       return clientGroupId === selectedGroupFilter;
     });
-  }, [tasks, viewFilter, user?.uid, selectedGroupFilter, clientsMap]);
+  }, [tasks, viewFilter, user?.uid, selectedGroupFilter, clientsMap, canSeeClient]);
 
   // Group recurring tasks by template_id
   const templateGroups = useMemo(() => {
@@ -625,7 +678,11 @@ export const TasksPage: React.FC = () => {
           : tplGroupId === selectedGroupFilter;
 
       // Only show if it matches group and (has tasks OR is an active template when viewing 'all')
-      if (tplMatchesGroup && (groupTasks.length > 0 || (viewFilter === 'all' && tpl && tpl.active))) {
+      if (
+        tplMatchesGroup &&
+        (groupTasks.length > 0 ||
+          (viewFilter === 'all' && tpl && tpl.active && canSeeClient(tpl.client_id)))
+      ) {
         groupsList.push({
           template: tpl,
           templateId: tplId,
@@ -641,7 +698,7 @@ export const TasksPage: React.FC = () => {
     groupsList.sort((a, b) => a.title.localeCompare(b.title));
 
     return groupsList;
-  }, [filteredTasks, templates, viewFilter, selectedGroupFilter, clientsMap]);
+  }, [filteredTasks, templates, viewFilter, selectedGroupFilter, clientsMap, canSeeClient]);
 
   // One-off tasks (template_id == null), sorted by due_date ascending
   const oneOffTasks = useMemo(() => {
@@ -665,18 +722,36 @@ export const TasksPage: React.FC = () => {
 
   // Task Actions
   const handleMarkComplete = async (task: Task) => {
-    // Only allowed for the assigned user
-    if (task.assigned_to !== user?.uid || task.status !== 'pending') return;
+    // Only allowed for an assigned user, on a pending task
+    if (!user || !isAssignee(task, user.uid) || task.status !== 'pending') return;
+
+    setCompletingTaskId(task.id);
+    setCompleteErrors((prev) => {
+      const next = { ...prev };
+      delete next[task.id];
+      return next;
+    });
 
     try {
       const taskRef = doc(db, 'tasks', task.id);
+      // Writes ONLY these three fields — the security rules allow an assignee nothing else.
       await updateDoc(taskRef, {
         status: 'done',
         completed_at: serverTimestamp(),
         completed_by: user.uid,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to mark task complete:', err);
+      const raw: string = err?.message || String(err);
+      const denied = err?.code === 'permission-denied' || /permission/i.test(raw);
+      setCompleteErrors((prev) => ({
+        ...prev,
+        [task.id]: denied
+          ? `Couldn't mark this complete: permission denied. Please tell your manager (the task rules need fixing). Details: ${raw}`
+          : `Couldn't mark this complete: ${raw}`,
+      }));
+    } finally {
+      setCompletingTaskId(null);
     }
   };
 
@@ -1167,8 +1242,10 @@ export const TasksPage: React.FC = () => {
               className="px-3 py-1.5 text-sm bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-blue cursor-pointer transition-colors"
             >
               <option value="all">All Groups</option>
-              <option value="unassigned">Unassigned</option>
-              {groups.map((g) => (
+              {(showUnassignedGroupOption || selectedGroupFilter === 'unassigned') && (
+                <option value="unassigned">Unassigned</option>
+              )}
+              {groupFilterOptions.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
                 </option>
@@ -1377,6 +1454,8 @@ export const TasksPage: React.FC = () => {
                               }
                               onAddComment={() => handleAddComment(task.id)}
                               onMarkComplete={() => handleMarkComplete(task)}
+                              isCompleting={completingTaskId === task.id}
+                              completeError={completeErrors[task.id] || null}
                               onEditTask={(e) => handleOpenEditTask(task, e)}
                               onDeleteTask={(e) => handleOpenDeleteTask(task, e)}
                             />
@@ -1429,6 +1508,8 @@ export const TasksPage: React.FC = () => {
                     }
                     onAddComment={() => handleAddComment(task.id)}
                     onMarkComplete={() => handleMarkComplete(task)}
+                    isCompleting={completingTaskId === task.id}
+                    completeError={completeErrors[task.id] || null}
                     onEditTask={(e) => handleOpenEditTask(task, e)}
                     onDeleteTask={(e) => handleOpenDeleteTask(task, e)}
                   />
@@ -1498,7 +1579,7 @@ export const TasksPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select a client</option>
-                    {clients.map((c) => (
+                    {clientOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -1898,7 +1979,7 @@ export const TasksPage: React.FC = () => {
                     className="w-full px-3 py-2 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
                   >
                     <option value="">Select a client</option>
-                    {clients.map((c) => (
+                    {clientOptions.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -2107,6 +2188,8 @@ interface TaskRowItemProps {
   onCommentInputChange: (val: string) => void;
   onAddComment: () => void;
   onMarkComplete: () => void;
+  isCompleting?: boolean;
+  completeError?: string | null;
   onEditTask: (e: React.MouseEvent) => void;
   onDeleteTask: (e: React.MouseEvent) => void;
 }
@@ -2126,12 +2209,14 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
   onCommentInputChange,
   onAddComment,
   onMarkComplete,
+  isCompleting = false,
+  completeError = null,
   onEditTask,
   onDeleteTask,
 }) => {
   const isOverdue = isTaskOverdue(task);
   const isDone = task.status === 'done';
-  const isAssignedToMe = task.assigned_to === currentUserId;
+  const isAssignedToMe = isAssignee(task, currentUserId);
 
   return (
     <div className="p-4 hover:bg-neutral-50/50 dark:hover:bg-neutral-700/30 transition-colors">
@@ -2205,10 +2290,11 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
             <button
               type="button"
               onClick={onMarkComplete}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer"
+              disabled={isCompleting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg shadow-xs transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-wait"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Mark Complete</span>
+              <span>{isCompleting ? 'Completing...' : 'Mark Complete'}</span>
             </button>
           )}
 
@@ -2256,6 +2342,16 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
           </button>
         </div>
       </div>
+
+      {completeError && (
+        <div
+          role="alert"
+          className="mt-3 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg flex items-start gap-2 text-xs text-red-700 dark:text-red-300 leading-relaxed"
+        >
+          <AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+          <span className="break-words">{completeError}</span>
+        </div>
+      )}
 
       {/* Collapsible Comments Section */}
       {isCommentsOpen && (

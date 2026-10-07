@@ -24,7 +24,11 @@
         },
         "client_ids": {
           "type": "array",
-          "description": "Optional list of client IDs this user is scoped to"
+          "description": "Client IDs this user may see when all_clients is false"
+        },
+        "all_clients": {
+          "type": "boolean",
+          "description": "false = user only sees the clients in client_ids. true or missing = user sees all clients"
         },
         "created_at": {
           "type": "string",

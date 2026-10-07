@@ -22,6 +22,7 @@ import autoTable from 'jspdf-autotable';
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { toDate } from '../utils/recurrence';
+import { useClientAccess } from '../utils/clientAccess';
 import type { UserDoc, Task, Client } from '../types';
 
 function formatDisplayDate(val: any): string {
@@ -73,17 +74,7 @@ export const ReportsPage: React.FC = () => {
   const { userDoc, user, loading: authLoading } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
   const isManager = userDoc?.role === 'manager';
-
-  // Guard: if non-manager (e.g. TL or employee) hits /dashboard/reports, redirect to tasks with message
-  if (!authLoading && !isManager) {
-    return (
-      <Navigate
-        to="/dashboard/tasks"
-        state={{ message: 'This section is only available to managers' }}
-        replace
-      />
-    );
-  }
+  const { canSeeClient } = useClientAccess();
 
   const [users, setUsers] = useState<UserDoc[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -217,12 +208,13 @@ export const ReportsPage: React.FC = () => {
     const { startMs, endMs } = rangeBounds;
     return tasks.filter((t) => {
       if (t.status === 'skipped') return false;
+      if (!canSeeClient(t.client_id)) return false;
       const dueDate = toDate(t.due_date);
       if (!dueDate) return false;
       const dueTime = dueDate.getTime();
       return dueTime >= startMs && dueTime <= endMs;
     });
-  }, [tasks, rangeBounds]);
+  }, [tasks, rangeBounds, canSeeClient]);
 
   // Target users to display in report
   const visibleUsers = useMemo(() => {
@@ -547,6 +539,18 @@ export const ReportsPage: React.FC = () => {
     const fileName = `task-report_${startDate}_to_${endDate}.pdf`;
     doc.save(fileName);
   };
+
+  // Guard: if non-manager (e.g. TL or employee) hits /dashboard/reports, redirect to tasks with message.
+  // (Kept after every hook so the hook order never changes between renders.)
+  if (!authLoading && !isManager) {
+    return (
+      <Navigate
+        to="/dashboard/tasks"
+        state={{ message: 'This section is only available to managers' }}
+        replace
+      />
+    );
+  }
 
   return (
     <div className="space-y-6">

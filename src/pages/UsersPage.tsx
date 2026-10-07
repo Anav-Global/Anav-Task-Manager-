@@ -21,12 +21,14 @@ import {
   KeyRound,
   ChevronDown,
   Pencil,
+  Building,
 } from 'lucide-react';
 import { auth, db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { createManagedUser } from '../firebase/secondaryAuth';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import type { UserDoc, UserRole } from '../types';
+import { ClientAccessPicker } from '../components/ClientAccessPicker';
+import type { UserDoc, UserRole, Client, ClientGroup } from '../types';
 
 const roleBadges: Record<UserRole, { bg: string; text: string; border: string; label: string }> = {
   manager: {
@@ -53,18 +55,9 @@ export const UsersPage: React.FC = () => {
   const { userDoc, loading: authLoading } = useAuth();
   const isManager = userDoc?.role === 'manager';
 
-  // Guard: if non-manager (e.g. TL or employee) hits /dashboard/users, redirect to tasks with message
-  if (!authLoading && !isManager) {
-    return (
-      <Navigate
-        to="/dashboard/tasks"
-        state={{ message: 'This section is only available to managers' }}
-        replace
-      />
-    );
-  }
-
   const [users, setUsers] = useState<UserDoc[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [groups, setGroups] = useState<ClientGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -90,6 +83,13 @@ export const UsersPage: React.FC = () => {
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Client Access modal state (which clients a user may see)
+  const [accessUser, setAccessUser] = useState<UserDoc | null>(null);
+  const [accessAll, setAccessAll] = useState(true);
+  const [accessSelected, setAccessSelected] = useState<string[]>([]);
+  const [isSavingAccess, setIsSavingAccess] = useState(false);
+  const [accessError, setAccessError] = useState<string | null>(null);
+
   // Toast feedback state
   const [toast, setToast] = useState<{
     type: 'success' | 'error';
@@ -111,6 +111,9 @@ export const UsersPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('employee');
+  // New users start limited to specific clients (nothing ticked) — the safe default.
+  const [newAccessAll, setNewAccessAll] = useState(false);
+  const [newSelectedClientIds, setNewSelectedClientIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -134,6 +137,7 @@ export const UsersPage: React.FC = () => {
             email: data.email || '',
             role: data.role || 'employee',
             client_ids: data.client_ids || [],
+            all_clients: typeof data.all_clients === 'boolean' ? data.all_clients : undefined,
             created_at: data.created_at,
           };
         });
@@ -152,11 +156,58 @@ export const UsersPage: React.FC = () => {
     return () => unsub();
   }, []);
 
+  // Subscribe to clients and groups (used by the Client Access picker)
+  useEffect(() => {
+    const unsubClients = onSnapshot(
+      collection(db, 'clients'),
+      (snapshot) => {
+        setClients(
+          snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              name: data.name || '',
+              group_id: data.group_id ?? null,
+              status: data.status === 'inactive' ? 'inactive' : 'active',
+              contact_info: data.contact_info || '',
+              created_at: data.created_at,
+              created_by: data.created_by || '',
+            } as Client;
+          })
+        );
+      },
+      (error) => console.error('Failed to list clients:', error)
+    );
+    const unsubGroups = onSnapshot(
+      collection(db, 'client_groups'),
+      (snapshot) => {
+        setGroups(
+          snapshot.docs.map((d) => {
+            const data = d.data();
+            return {
+              id: d.id,
+              name: data.name || '',
+              created_at: data.created_at,
+              created_by: data.created_by || '',
+            } as ClientGroup;
+          })
+        );
+      },
+      (error) => console.error('Failed to list groups:', error)
+    );
+    return () => {
+      unsubClients();
+      unsubGroups();
+    };
+  }, []);
+
   const openAddModal = () => {
     setName('');
     setEmail('');
     setPassword('');
     setRole('employee');
+    setNewAccessAll(false);
+    setNewSelectedClientIds([]);
     setErrorMessage(null);
     setSuccessInfo(null);
     setCopied(false);
@@ -200,6 +251,8 @@ export const UsersPage: React.FC = () => {
         email: trimmedEmail,
         password: trimmedPassword,
         role,
+        all_clients: newAccessAll,
+        client_ids: newAccessAll ? [] : newSelectedClientIds,
       });
 
       // Display one-time plaintext credentials to relay
@@ -327,6 +380,49 @@ export const UsersPage: React.FC = () => {
     }
   };
 
+  // 5. Client Access (which clients this user may see)
+  const openAccessModal = (targetUser: UserDoc) => {
+    setAccessUser(targetUser);
+    setAccessAll(targetUser.all_clients !== false);
+    setAccessSelected(targetUser.client_ids || []);
+    setAccessError(null);
+  };
+
+  const closeAccessModal = () => {
+    setAccessUser(null);
+    setAccessError(null);
+  };
+
+  const handleSaveAccess = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!accessUser) return;
+
+    setIsSavingAccess(true);
+    setAccessError(null);
+
+    try {
+      // Update ONLY all_clients and client_ids on that user's document.
+      await updateDoc(doc(db, 'users', accessUser.id), {
+        all_clients: accessAll,
+        client_ids: accessSelected,
+      });
+
+      const who = accessUser.name || accessUser.email;
+      setToast({
+        type: 'success',
+        text: accessAll
+          ? `${who} can now see all clients.`
+          : `${who} is now limited to ${accessSelected.length} ${accessSelected.length === 1 ? 'client' : 'clients'}.`,
+      });
+      setAccessUser(null);
+    } catch (err: any) {
+      console.error('Failed to update client access:', err);
+      setAccessError(err?.message || 'Failed to update client access.');
+    } finally {
+      setIsSavingAccess(false);
+    }
+  };
+
   // 4. Edit User (Name & Email) Handler
   const openEditModal = (targetUser: UserDoc) => {
     // Prevent manager from self-editing here (matches role/remove access safeguards)
@@ -380,6 +476,18 @@ export const UsersPage: React.FC = () => {
       setIsSavingEdit(false);
     }
   };
+
+  // Guard: if non-manager (e.g. TL or employee) hits /dashboard/users, redirect to tasks with message.
+  // (Kept after every hook so the hook order never changes between renders.)
+  if (!authLoading && !isManager) {
+    return (
+      <Navigate
+        to="/dashboard/tasks"
+        state={{ message: 'This section is only available to managers' }}
+        replace
+      />
+    );
+  }
 
   const roleChangeUserName = roleChangeTarget?.user.name || roleChangeTarget?.user.email || 'User';
   const removeAccessUserName = removeAccessTarget?.name || removeAccessTarget?.email || 'User';
@@ -475,10 +583,13 @@ export const UsersPage: React.FC = () => {
                 {users.map((u) => {
                   const roleStyle = roleBadges[u.role] || roleBadges.employee;
                   const isCurrentUser = u.id === userDoc?.id;
+                  const scopedCount = (u.client_ids || []).length;
                   const clientScopeDisplay =
-                    !u.client_ids || u.client_ids.length === 0
+                    u.all_clients !== false
                       ? 'All Clients'
-                      : `${u.client_ids.length} ${u.client_ids.length === 1 ? 'client' : 'clients'}`;
+                      : scopedCount === 0
+                      ? 'No clients'
+                      : `${scopedCount} ${scopedCount === 1 ? 'client' : 'clients'}`;
 
                   return (
                     <tr key={u.id} className="hover:bg-neutral-50/80 dark:hover:bg-neutral-700/50 transition-colors">
@@ -536,6 +647,18 @@ export const UsersPage: React.FC = () => {
                       </td>
                       <td className="py-3.5 px-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {/* Client Access - which clients this user may see (available on every row) */}
+                          <button
+                            type="button"
+                            id={`client-access-${u.id}`}
+                            onClick={() => openAccessModal(u)}
+                            title={`Choose which clients ${u.name || u.email} can see`}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-neutral-700 dark:text-neutral-300 bg-neutral-50 dark:bg-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-600 hover:text-neutral-900 dark:hover:text-neutral-100 border border-neutral-200 dark:border-neutral-600 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Building className="w-3.5 h-3.5 text-neutral-500 dark:text-neutral-400" />
+                            <span>Client Access</span>
+                          </button>
+
                           {/* Edit User (pencil icon) - manager only, hidden on manager's own row */}
                           {!isCurrentUser && (
                             <button
@@ -774,21 +897,18 @@ export const UsersPage: React.FC = () => {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="block text-xs font-semibold text-neutral-400 dark:text-neutral-500 uppercase tracking-wider">
-                      Client Scope
-                    </label>
-                    <span className="text-[11px] text-neutral-400 dark:text-neutral-500 flex items-center gap-1">
-                      <Info className="w-3 h-3" />
-                      Client scoping UI coming in a later phase.
-                    </span>
-                  </div>
-                  <div
-                    title="Client scoping UI coming in a later phase."
-                    className="w-full px-3 py-2 text-xs border border-neutral-200 dark:border-neutral-700 bg-neutral-100 dark:bg-neutral-900/40 text-neutral-400 dark:text-neutral-500 rounded-lg cursor-not-allowed select-none"
-                  >
-                    [ Placeholder — All clients assigned by default ]
-                  </div>
+                  <label className="block text-xs font-semibold text-neutral-700 dark:text-neutral-300 uppercase tracking-wider mb-1.5">
+                    Client Access
+                  </label>
+                  <ClientAccessPicker
+                    idPrefix="new-user-access"
+                    clients={clients}
+                    groups={groups}
+                    allClients={newAccessAll}
+                    onAllClientsChange={setNewAccessAll}
+                    selectedIds={newSelectedClientIds}
+                    onSelectedIdsChange={setNewSelectedClientIds}
+                  />
                 </div>
 
                 <div className="pt-2 flex items-center justify-end gap-3">
@@ -902,6 +1022,66 @@ export const UsersPage: React.FC = () => {
                   className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50 cursor-pointer"
                 >
                   {isSavingEdit ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Client Access Modal (manager only, updates ONLY all_clients and client_ids) */}
+      {accessUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl shadow-xl max-w-lg w-full border border-neutral-200 dark:border-neutral-700 p-6 transition-colors">
+            <div className="flex items-center justify-between pb-3 border-b border-neutral-200 dark:border-neutral-700 mb-4">
+              <div>
+                <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-100">Client Access</h2>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+                  Which clients can {accessUser.name || accessUser.email} see?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closeAccessModal}
+                className="p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 rounded-md transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {accessError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded-lg text-xs text-red-700 dark:text-red-300">
+                {accessError}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAccess} className="space-y-4">
+              <ClientAccessPicker
+                idPrefix="edit-user-access"
+                clients={clients}
+                groups={groups}
+                allClients={accessAll}
+                onAllClientsChange={setAccessAll}
+                selectedIds={accessSelected}
+                onSelectedIdsChange={setAccessSelected}
+              />
+
+              <div className="pt-2 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={closeAccessModal}
+                  disabled={isSavingAccess}
+                  className="px-4 py-2 text-sm font-medium text-neutral-700 dark:text-neutral-300 bg-white dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-600 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  id="save-client-access-btn"
+                  type="submit"
+                  disabled={isSavingAccess}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 rounded-lg transition-opacity disabled:opacity-50 cursor-pointer"
+                >
+                  {isSavingAccess ? 'Saving...' : 'Save Access'}
                 </button>
               </div>
             </form>

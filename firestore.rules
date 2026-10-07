@@ -18,10 +18,26 @@ service cloud.firestore {
       return isSignedIn() && userRole() == 'manager';
     }
 
+    // assigned_to can be a list (new tasks) or a plain string (old tasks).
+    function isAssignee(taskData) {
+      let a = taskData.get('assigned_to', []);
+      return (a is list && a.hasAny([request.auth.uid]))
+          || (a is string && a == request.auth.uid);
+    }
+
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isTlOrManager());
       allow create: if isManager();
-      allow update, delete: if isManager();
+      allow update: if (
+          isManager()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['role', 'name', 'email', 'client_ids', 'all_clients'])
+        ) || (
+          isTlOrManager()
+          && request.auth.uid == userId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['client_ids'])
+        );
+      allow delete: if isManager();
     }
 
     match /clients/{clientId} {
@@ -48,13 +64,11 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isTlOrManager();
       allow delete: if isTlOrManager();
-
       allow update: if isTlOrManager()
         || (
           isSignedIn()
-          && resource.data.assigned_to == request.auth.uid
-          && request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['status', 'completed_at', 'completed_by'])
+          && isAssignee(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'completed_at', 'completed_by'])
         );
     }
 
@@ -62,6 +76,12 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update, delete: if false;
+    }
+
+    // Kept so re-enabling the reminder workflow later needs no rules change.
+    match /reminder_runs/{runId} {
+      allow read, create, delete: if isManager();
+      allow update: if false;
     }
   }
 }

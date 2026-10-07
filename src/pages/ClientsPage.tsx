@@ -8,6 +8,7 @@ import {
   updateDoc,
   deleteDoc,
   serverTimestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import {
   Plus,
@@ -24,15 +25,18 @@ import { db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useClientAccess } from '../utils/clientAccess';
 import type { Client, ClientGroup } from '../types';
 
 export const ClientsPage: React.FC = () => {
   const { user, userDoc } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const { hasAllClients, filterVisibleClients } = useClientAccess();
 
   const [clients, setClients] = useState<Client[]>([]);
   const [groups, setGroups] = useState<ClientGroup[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState<string | null>(null);
 
   // Filters
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('all');
@@ -110,14 +114,16 @@ export const ClientsPage: React.FC = () => {
     return map;
   }, [groups]);
 
-  // Client scoping filter based on userDoc.client_ids (if configured for user)
-  const scopedClients = useMemo(() => {
-    if (userDoc?.client_ids && userDoc.client_ids.length > 0) {
-      const allowedSet = new Set(userDoc.client_ids);
-      return clients.filter((c) => allowedSet.has(c.id));
-    }
-    return clients;
-  }, [clients, userDoc]);
+  // Client scoping: a user limited to specific clients (all_clients === false) only sees those.
+  const scopedClients = useMemo(() => filterVisibleClients(clients), [clients, filterVisibleClients]);
+
+  // Group filter options: a scoped user only sees groups that contain at least one of their clients.
+  const groupOptions = useMemo(() => {
+    if (hasAllClients) return groups;
+    const visibleGroupIds = new Set(scopedClients.map((c) => c.group_id).filter(Boolean) as string[]);
+    return groups.filter((g) => visibleGroupIds.has(g.id));
+  }, [groups, scopedClients, hasAllClients]);
+  const showUnassignedOption = hasAllClients || scopedClients.some((c) => !c.group_id);
 
   // Filtered clients
   const filteredClients = useMemo(() => {
@@ -193,7 +199,7 @@ export const ClientsPage: React.FC = () => {
       } else {
         // Create new client - strictly matching Firestore schema:
         // name, group_id, status, contact_info, created_at, created_by
-        await addDoc(collection(db, 'clients'), {
+        const newClientRef = await addDoc(collection(db, 'clients'), {
           name: trimmedName,
           group_id: targetGroupId,
           status: formStatus,
@@ -201,6 +207,20 @@ export const ClientsPage: React.FC = () => {
           created_at: serverTimestamp(),
           created_by: user?.uid || '',
         });
+
+        // A user limited to specific clients must be able to see the client they just created.
+        if (!hasAllClients && user) {
+          try {
+            await updateDoc(doc(db, 'users', user.uid), { client_ids: arrayUnion(newClientRef.id) });
+          } catch (accessErr: any) {
+            console.error('Client created, but it could not be added to your own client list:', accessErr);
+            setNotice(
+              `"${trimmedName}" was created, but it could not be added to your own client list (${
+                accessErr?.message || 'unknown error'
+              }). Ask a manager to add it under Users → Client Access.`
+            );
+          }
+        }
       }
       closeModal();
     } catch (err: any) {
@@ -248,6 +268,19 @@ export const ClientsPage: React.FC = () => {
         )}
       </div>
 
+      {notice && (
+        <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl flex items-start justify-between gap-3 text-sm text-amber-900 dark:text-amber-200">
+          <p className="text-xs leading-relaxed">{notice}</p>
+          <button
+            type="button"
+            onClick={() => setNotice(null)}
+            className="p-1 text-amber-600 dark:text-amber-400 hover:text-amber-900 dark:hover:text-amber-200 rounded-md cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Filter and Control Bar */}
       <div className="bg-white dark:bg-neutral-800 p-4 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs flex flex-wrap items-center justify-between gap-4 transition-colors">
         <div className="flex flex-wrap items-center gap-3">
@@ -262,8 +295,8 @@ export const ClientsPage: React.FC = () => {
             className="px-3 py-1.5 text-sm bg-neutral-50 dark:bg-neutral-700 border border-neutral-300 dark:border-neutral-600 rounded-lg text-neutral-800 dark:text-neutral-100 focus:outline-none focus:ring-2 focus:ring-brand-blue"
           >
             <option value="all">All Groups</option>
-            <option value="unassigned">Unassigned (No Group)</option>
-            {groups.map((g) => (
+            {showUnassignedOption && <option value="unassigned">Unassigned (No Group)</option>}
+            {groupOptions.map((g) => (
               <option key={g.id} value={g.id}>
                 {g.name}
               </option>
@@ -304,6 +337,8 @@ export const ClientsPage: React.FC = () => {
                 ? isPrivileged
                   ? 'No clients have been created yet. Click "Add Client" to get started.'
                   : 'No clients are currently registered in the database.'
+                : !hasAllClients && scopedClients.length === 0
+                ? 'No clients assigned to you yet — ask your manager.'
                 : 'No clients match your selected group or active/inactive filter.'}
             </p>
           </div>

@@ -21,11 +21,13 @@ import { db } from '../firebase/config';
 import { handleFirestoreError, OperationType } from '../firebase/errors';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useClientAccess } from '../utils/clientAccess';
 import type { Client, ClientGroup } from '../types';
 
 export const GroupsPage: React.FC = () => {
   const { user, userDoc } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const { hasAllClients, filterVisibleClients } = useClientAccess();
 
   const [groups, setGroups] = useState<ClientGroup[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
@@ -94,7 +96,7 @@ export const GroupsPage: React.FC = () => {
     return () => unsub();
   }, []);
 
-  // Count clients per group ID
+  // Count ALL clients per group ID — used for the delete-block, which must not depend on who is looking.
   const clientCountByGroupId = useMemo(() => {
     const counts = new Map<string, number>();
     clients.forEach((client) => {
@@ -104,6 +106,26 @@ export const GroupsPage: React.FC = () => {
     });
     return counts;
   }, [clients]);
+
+  // Count only the clients THIS user may see — used for what is displayed.
+  const visibleClientCountByGroupId = useMemo(() => {
+    const counts = new Map<string, number>();
+    filterVisibleClients(clients).forEach((client) => {
+      if (client.group_id) {
+        counts.set(client.group_id, (counts.get(client.group_id) || 0) + 1);
+      }
+    });
+    return counts;
+  }, [clients, filterVisibleClients]);
+
+  // A user limited to specific clients only sees groups holding at least one of their clients
+  // (plus groups they created themselves, so a brand-new empty group doesn't vanish on them).
+  const visibleGroups = useMemo(() => {
+    if (hasAllClients) return groups;
+    return groups.filter(
+      (g) => (visibleClientCountByGroupId.get(g.id) || 0) > 0 || (!!user && g.created_by === user.uid)
+    );
+  }, [groups, hasAllClients, visibleClientCountByGroupId, user]);
 
   const openAddModal = () => {
     setEditingGroup(null);
@@ -257,20 +279,22 @@ export const GroupsPage: React.FC = () => {
             <div className="w-6 h-6 border-2 border-neutral-300 dark:border-neutral-600 border-t-neutral-800 dark:border-t-neutral-100 rounded-full animate-spin mx-auto mb-2" />
             Loading groups...
           </div>
-        ) : groups.length === 0 ? (
+        ) : visibleGroups.length === 0 ? (
           <div className="p-12 text-center">
             <FolderTree className="w-10 h-10 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
             <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">No groups found</p>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto">
-              {isPrivileged
+              {!hasAllClients && groups.length > 0
+                ? 'No groups to show — none of your assigned clients belong to a group yet.'
+                : isPrivileged
                 ? 'No client groups have been created yet. Click "Add Group" to create the first group.'
                 : 'No client groups are currently available in the database.'}
             </p>
           </div>
         ) : (
           <div className="divide-y divide-neutral-200 dark:divide-neutral-700">
-            {groups.map((group) => {
-              const clientCount = clientCountByGroupId.get(group.id) || 0;
+            {visibleGroups.map((group) => {
+              const clientCount = visibleClientCountByGroupId.get(group.id) || 0;
 
               return (
                 <div

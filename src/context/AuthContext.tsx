@@ -1,8 +1,7 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signOut as fbSignOut, type User } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
-import { handleFirestoreError, OperationType } from '../firebase/errors';
 import type { UserDoc } from '../types';
 
 interface AuthContextType {
@@ -24,58 +23,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [noUserDoc, setNoUserDoc] = useState<boolean>(false);
   const [permissionError, setPermissionError] = useState<boolean>(false);
 
-  const fetchUserDoc = async (uid: string) => {
-    try {
-      setPermissionError(false);
-      const userRef = doc(db, 'users', uid);
-      const snapshot = await getDoc(userRef);
-      if (snapshot.exists()) {
-        const data = snapshot.data();
-        setUserDoc({
-          id: snapshot.id,
-          name: data.name || '',
-          email: data.email || '',
-          role: data.role || 'employee',
-          client_ids: data.client_ids || [],
-          created_at: data.created_at,
-        });
-        setNoUserDoc(false);
-      } else {
-        setUserDoc(null);
-        setNoUserDoc(true);
-      }
-    } catch (err: any) {
-      console.warn('Failed to fetch user doc:', err);
-      // Check for permission errors
-      const isPermissionErr =
-        err?.code === 'permission-denied' ||
-        (typeof err?.message === 'string' && err.message.toLowerCase().includes('permission'));
-      
-      if (isPermissionErr) {
-        setPermissionError(true);
-      }
-      setUserDoc(null);
-      setNoUserDoc(true);
+  const unsubUserDocRef = useRef<(() => void) | null>(null);
+
+  const stopUserDocListener = useCallback(() => {
+    if (unsubUserDocRef.current) {
+      unsubUserDocRef.current();
+      unsubUserDocRef.current = null;
     }
-  };
+  }, []);
+
+  // The signed-in user's profile is listened to LIVE, so a change a manager makes
+  // (client access, role, removal) applies immediately without a page reload.
+  const startUserDocListener = useCallback(
+    (uid: string) => {
+      stopUserDocListener();
+      setPermissionError(false);
+
+      unsubUserDocRef.current = onSnapshot(
+        doc(db, 'users', uid),
+        (snapshot) => {
+          setPermissionError(false);
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            setUserDoc({
+              id: snapshot.id,
+              name: data.name || '',
+              email: data.email || '',
+              role: data.role || 'employee',
+              client_ids: data.client_ids || [],
+              all_clients: typeof data.all_clients === 'boolean' ? data.all_clients : undefined,
+              created_at: data.created_at,
+            });
+            setNoUserDoc(false);
+          } else {
+            setUserDoc(null);
+            setNoUserDoc(true);
+          }
+          setLoading(false);
+        },
+        (err: any) => {
+          console.warn('Failed to listen to user doc:', err);
+          const isPermissionErr =
+            err?.code === 'permission-denied' ||
+            (typeof err?.message === 'string' && err.message.toLowerCase().includes('permission'));
+
+          if (isPermissionErr) {
+            setPermissionError(true);
+          }
+          setUserDoc(null);
+          setNoUserDoc(true);
+          setLoading(false);
+        }
+      );
+    },
+    [stopUserDocListener]
+  );
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        await fetchUserDoc(currentUser.uid);
+        setLoading(true);
+        startUserDocListener(currentUser.uid);
       } else {
+        stopUserDocListener();
         setUserDoc(null);
         setNoUserDoc(false);
         setPermissionError(false);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      unsubscribeAuth();
+      stopUserDocListener();
+    };
+  }, [startUserDocListener, stopUserDocListener]);
 
   const handleSignOut = async () => {
+    // Stop listening first, so signing out can't trigger a stray permission error.
+    stopUserDocListener();
     await fbSignOut(auth);
     setUser(null);
     setUserDoc(null);
@@ -83,9 +110,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setPermissionError(false);
   };
 
+  // "Check Again" on the Account-not-set-up screen: re-attach the listener.
   const refreshUserDoc = async () => {
     if (auth.currentUser) {
-      await fetchUserDoc(auth.currentUser.uid);
+      startUserDocListener(auth.currentUser.uid);
     }
   };
 

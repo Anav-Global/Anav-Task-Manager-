@@ -17,6 +17,9 @@ export interface CreateUserParams {
   email: string;
   password: string;
   role: UserRole;
+  /** false = user only sees the clients listed in client_ids. Defaults to true (all clients). */
+  all_clients?: boolean;
+  client_ids?: string[];
 }
 
 export interface CreateUserResult {
@@ -30,6 +33,8 @@ export async function createManagedUser({
   email,
   password,
   role,
+  all_clients = true,
+  client_ids = [],
 }: CreateUserParams): Promise<CreateUserResult> {
   const secondaryAuth = getSecondaryAuth();
 
@@ -51,7 +56,8 @@ export async function createManagedUser({
       name,
       email,
       role,
-      client_ids: [],
+      all_clients,
+      client_ids,
       created_at: serverTimestamp(),
     });
   } catch (firestoreErr) {

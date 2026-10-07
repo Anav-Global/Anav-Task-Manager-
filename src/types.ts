@@ -8,6 +8,11 @@ export interface UserDoc {
   email: string;
   role: UserRole;
   client_ids?: string[];
+  /**
+   * false  -> user only sees the clients listed in client_ids.
+   * true / missing -> user sees all clients.
+   */
+  all_clients?: boolean;
   created_at: Timestamp | string | Date;
 }
 

@@ -31,6 +31,7 @@ import {
 import { db } from '../firebase/config';
 import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { useClientAccess } from '../utils/clientAccess';
 import type { Client, ClientGroup, SOP } from '../types';
 
 function formatTimestamp(val: any): string {
@@ -88,6 +89,7 @@ export const ClientDetailPage: React.FC = () => {
   const { clientId } = useParams<{ clientId: string }>();
   const { user, userDoc } = useAuth();
   const isPrivileged = userDoc?.role === 'tl' || userDoc?.role === 'manager';
+  const { canSeeClient } = useClientAccess();
 
   // Client State
   const [client, setClient] = useState<Client | null>(null);
@@ -176,7 +178,8 @@ export const ClientDetailPage: React.FC = () => {
 
   // 3. Fetch SOPs for this client using Firestore query sorted by last_updated_at ascending
   useEffect(() => {
-    if (!clientId) {
+    // No client in the URL, or this user has no access to it: never fetch its SOPs.
+    if (!clientId || !canSeeClient(clientId)) {
       setSops([]);
       setSopsLoading(false);
       return;
@@ -253,7 +256,7 @@ export const ClientDetailPage: React.FC = () => {
     return () => {
       if (unsub) unsub();
     };
-  }, [clientId]);
+  }, [clientId, canSeeClient]);
 
   // Expand / Collapse toggler
   const toggleSopExpand = (id: string) => {
@@ -446,6 +449,39 @@ export const ClientDetailPage: React.FC = () => {
           <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">Client not found</h2>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto mb-6">
             The requested client document does not exist or may have been deleted.
+          </p>
+          <Link
+            to="/dashboard/clients"
+            className="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-brand-purple to-brand-blue hover:opacity-90 text-white text-xs font-semibold rounded-lg transition-opacity"
+          >
+            Return to Clients List
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Client exists, but this user is not allowed to see it
+  if (!canSeeClient(client.id)) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <Link
+            to="/dashboard/clients"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-100 transition-colors"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Clients</span>
+          </Link>
+        </div>
+
+        <div className="bg-white dark:bg-neutral-800 rounded-xl border border-neutral-200 dark:border-neutral-700 shadow-xs p-12 text-center max-w-lg mx-auto transition-colors">
+          <AlertCircle className="w-12 h-12 text-neutral-300 dark:text-neutral-600 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-neutral-900 dark:text-neutral-100">
+            You don't have access to this client
+          </h2>
+          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 max-w-sm mx-auto mb-6">
+            This client isn't in your assigned list. Ask a manager if you need access.
           </p>
           <Link
             to="/dashboard/clients"
