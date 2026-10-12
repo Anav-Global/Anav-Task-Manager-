@@ -40,6 +40,7 @@ import { useAuth } from '../context/AuthContext';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { useClientAccess } from '../utils/clientAccess';
 import { isAssignee } from '../utils/assignees';
+import { canCompleteNow, completionOpensLabel } from '../utils/taskCompletion';
 import type {
   Task,
   TaskTemplate,
@@ -724,6 +725,15 @@ export const TasksPage: React.FC = () => {
   const handleMarkComplete = async (task: Task) => {
     // Only allowed for an assigned user, on a pending task
     if (!user || !isAssignee(task, user.uid) || task.status !== 'pending') return;
+
+    // A task due in a future month can't be completed yet (the button is hidden too; this is the safety net)
+    if (!canCompleteNow(task.due_date)) {
+      setCompleteErrors((prev) => ({
+        ...prev,
+        [task.id]: `This task is due in a future month — you can mark it complete from ${completionOpensLabel(task.due_date)}.`,
+      }));
+      return;
+    }
 
     setCompletingTaskId(task.id);
     setCompleteErrors((prev) => {
@@ -2217,6 +2227,7 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
   const isOverdue = isTaskOverdue(task);
   const isDone = task.status === 'done';
   const isAssignedToMe = isAssignee(task, currentUserId);
+  const completionOpen = canCompleteNow(task.due_date);
 
   return (
     <div className="p-4 hover:bg-neutral-50/50 dark:hover:bg-neutral-700/30 transition-colors">
@@ -2286,7 +2297,16 @@ const TaskRowItem: React.FC<TaskRowItemProps> = ({
         {/* Right Column: Actions */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
           {/* Mark Complete Button (ONLY for user assigned to this pending/overdue task) */}
-          {isAssignedToMe && !isDone && (
+          {isAssignedToMe && !isDone && !completionOpen && (
+            <span
+              title="This task is due in a future month, so it can't be marked complete yet."
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-700/60 border border-neutral-200 dark:border-neutral-600 rounded-lg"
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>Opens {completionOpensLabel(task.due_date)}</span>
+            </span>
+          )}
+          {isAssignedToMe && !isDone && completionOpen && (
             <button
               type="button"
               onClick={onMarkComplete}
