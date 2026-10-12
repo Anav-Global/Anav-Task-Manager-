@@ -40,12 +40,16 @@ export const ClientAccessPicker: React.FC<ClientAccessPickerProps> = ({
 
   const shownClients = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return sortedClients;
-    return sortedClients.filter((c) => {
+    // The group dropdown also FILTERS the list, so picking a group shows only that group's clients.
+    const inGroup = groupPick
+      ? sortedClients.filter((c) => (groupPick === '__none__' ? !c.group_id : c.group_id === groupPick))
+      : sortedClients;
+    if (!q) return inGroup;
+    return inGroup.filter((c) => {
       const groupName = (c.group_id ? groupNameById.get(c.group_id) : '') || '';
       return c.name.toLowerCase().includes(q) || groupName.toLowerCase().includes(q);
     });
-  }, [sortedClients, search, groupNameById]);
+  }, [sortedClients, search, groupPick, groupNameById]);
 
   const toggleClient = (id: string) => {
     if (selectedSet.has(id)) {
@@ -122,7 +126,7 @@ export const ClientAccessPicker: React.FC<ClientAccessPickerProps> = ({
               onChange={(e) => setGroupPick(e.target.value)}
               className="flex-1 px-3 py-1.5 text-sm border border-neutral-300 dark:border-neutral-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-blue bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100"
             >
-              <option value="">Pick a group...</option>
+              <option value="">All groups</option>
               {sortedGroups.map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}
@@ -151,7 +155,7 @@ export const ClientAccessPicker: React.FC<ClientAccessPickerProps> = ({
           <div className="max-h-56 overflow-y-auto border border-neutral-200 dark:border-neutral-700 rounded-lg divide-y divide-neutral-100 dark:divide-neutral-700">
             {shownClients.length === 0 ? (
               <div className="p-4 text-center text-xs text-neutral-400 dark:text-neutral-500">
-                {clients.length === 0 ? 'No clients exist yet.' : 'No clients match your search.'}
+                {clients.length === 0 ? 'No clients exist yet.' : 'No clients match your filter.'}
               </div>
             ) : (
               shownClients.map((c) => {
